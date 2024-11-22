@@ -1,0 +1,47 @@
+{
+  "manifest_version": 3,
+  "name": "Edge TTS Reader",
+  "version": "1.0",
+  "description": "Free, high-quality text-to-speech service leveraging the Read Aloud API from Microsoft Edge. Select text on any webpage and listen to it read aloud in a natural voice. Or, listen to the entire page.",
+  "author": "Travis",
+  "homepage_url": "https://github.com/travisvn/edge-tts-chrome-extension",
+  "minimum_chrome_version": "88",
+  "default_locale": "en",
+  "offline_enabled": true,
+  "incognito": "split",
+  "action": {
+    "default_popup": "popup/index.html"
+  },
+  "background": {
+    "service_worker": "background/bundle.js"
+  },
+  "host_permissions": [
+    "https://speech.platform.bing.com/*",
+    "wss://speech.platform.bing.com/*"
+  ],
+  "permissions": [
+    "contextMenus",
+    "activeTab",
+    "scripting",
+    "storage",
+    "tabs"
+  ],
+  "content_scripts": [
+    {
+      "matches": [
+        "<all_urls>"
+      ],
+      "js": [
+        "contentScript/bundle.js"
+      ]
+    }
+  ],
+  "icons": {
+    "16": "icons/icon16.png",
+    "19": "icons/icon19.png",
+    "32": "icons/icon32.png",
+    "38": "icons/icon38.png",
+    "48": "icons/icon48.png",
+    "128": "icons/icon128.png"
+  }
+}
