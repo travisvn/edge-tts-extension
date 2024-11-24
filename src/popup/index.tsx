@@ -22,7 +22,7 @@ function Popup() {
   const voices = TOP_VOICES;
   const [selectedVoice, setSelectedVoice] = useState<string>('en-US-ChristopherNeural');
   const [customVoice, setCustomVoice] = useState<string>('');
-  const [speed, setSpeed] = useState<number>(1.0);
+  const [speed, setSpeed] = useState<number>(1.2);
 
   const [darkMode, setDarkMode] = useState<boolean>(false);
 

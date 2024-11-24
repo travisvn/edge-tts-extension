@@ -13,7 +13,7 @@
   ],
   "author": "Travis",
   "license": "GPL-3.0",
-  "description": "Free, high-quality text-to-speech service leveraging the Read Aloud API from Microsoft Edge. Select text on any webpage and listen to it read aloud in a natural voice. Or, listen to the entire page.",
+  "description": "Text-to-speech service leveraging the Read Aloud API from Microsoft Edge. Select text on any webpage and listen to it read aloud in a natural voice. Or, listen to the entire page.",
   "dependencies": {
     "edge-tts-client": "^1.0.2",
     "lucide-react": "^0.460.0",

@@ -1,12 +1,11 @@
 {
   "manifest_version": 3,
-  "name": "Edge TTS Reader",
+  "name": "Edge Text to Speech Voice Reader",
   "version": "1.0",
-  "description": "Free, high-quality text-to-speech service leveraging the Read Aloud API from Microsoft Edge. Select text on any webpage and listen to it read aloud in a natural voice. Or, listen to the entire page.",
+  "description": "Text-to-speech service leveraging the Read Aloud API from Microsoft Edge.",
   "author": "Travis",
   "homepage_url": "https://github.com/travisvn/edge-tts-chrome-extension",
   "minimum_chrome_version": "88",
-  "default_locale": "en",
   "offline_enabled": true,
   "incognito": "split",
   "action": {
