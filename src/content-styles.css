@@ -1,23 +1,23 @@
 :root {
-  --bg-primary: #ffffff;
-  --bg-secondary: #f8f9fa;
-  --text-primary: #000000;
-  --text-secondary: #666666;
-  --border-color: #cccccc;
-  --button-bg: #007bff;
-  --button-text: #ffffff;
-  --hover-bg: #0056b3;
+  --etts-bg-primary: #ffffff;
+  --etts-bg-secondary: #f8f9fa;
+  --etts-text-primary: #000000;
+  --etts-text-secondary: #666666;
+  --etts-border-color: #cccccc;
+  --etts-button-bg: #007bff;
+  --etts-button-text: #ffffff;
+  --etts-hover-bg: #0056b3;
 }
 
 [data-theme='dark'] {
-  --bg-primary: #1a1a1a;
-  --bg-secondary: #2d2d2d;
-  --text-primary: #ffffff;
-  --text-secondary: #cccccc;
-  --border-color: #404040;
-  --button-bg: #0d6efd;
-  --button-text: #ffffff;
-  --hover-bg: #0b5ed7;
+  --etts-bg-primary: #1a1a1a;
+  --etts-bg-secondary: #2d2d2d;
+  --etts-text-primary: #ffffff;
+  --etts-text-secondary: #cccccc;
+  --etts-border-color: #404040;
+  --etts-button-bg: #0d6efd;
+  --etts-button-text: #ffffff;
+  --etts-hover-bg: #0b5ed7;
 }
 
 .flex-center {
@@ -93,16 +93,16 @@
 .lucide {
   width: 20px;
   height: 20px;
-  stroke: var(--button-text);
+  stroke: var(--etts-button-text);
 }
 
 .tts-controls {
   position: fixed;
   bottom: 20px;
   right: 20px;
-  background: var(--bg-primary);
-  color: var(--text-primary);
-  border: 1px solid var(--border-color);
+  background: var(--etts-bg-primary);
+  color: var(--etts-text-primary);
+  border: 1px solid var(--etts-border-color);
   border-radius: 8px;
   padding: 15px;
   box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
@@ -112,8 +112,8 @@
 }
 
 .tts-button {
-  background: var(--button-bg);
-  color: var(--button-text);
+  background: var(--etts-button-bg);
+  color: var(--etts-button-text);
   border: none;
   border-radius: 4px;
   padding: 8px 16px;
@@ -126,7 +126,7 @@
 }
 
 .tts-button:hover {
-  background: var(--hover-bg);
+  background: var(--etts-hover-bg);
 }
 
 .tts-button.red {
@@ -138,8 +138,8 @@
 }
 
 .loading-spinner {
-  border: 2px solid var(--bg-secondary);
-  border-top: 2px solid var(--button-bg);
+  border: 2px solid var(--etts-bg-secondary);
+  border-top: 2px solid var(--etts-button-bg);
   border-radius: 50%;
   width: 20px;
   height: 20px;

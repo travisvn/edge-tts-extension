@@ -1,6 +1,6 @@
 {
   "name": "edge-tts-chrome-extension",
-  "version": "1.0.1",
+  "version": "1.0.2",
   "scripts": {
     "dev": "webpack --mode development",
     "build": "webpack --mode production",
