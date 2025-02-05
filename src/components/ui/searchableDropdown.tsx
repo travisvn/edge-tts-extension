@@ -66,22 +66,22 @@ export default function SearchableDropdown({ onChange }: { onChange: (voice: str
       <List.Root
         {...getMenuProps()}
 
-        className={`absolute transition-all duration-300 w-full mt-1 p-2  border border-gray-300 bg-white dark:bg-slate-700 dark:border-gray-700 shadow-md rounded-md z-30
-           outline-none ring-0 
+        className={`absolute transition-all duration-300 w-full mt-1 p-2 border border-gray-300 bg-white dark:bg-slate-700 dark:border-gray-700 shadow-md rounded-md z-30
+           outline-none ring-0 max-h-[200px] overflow-y-auto
           ${isOpen ? 'block' : 'hidden'}
-          `}
+          flex flex-col gap-2`}
       >
         {inputItems.map((item, index) => (
           <List.Item
             key={item}
             {...getItemProps({ item, index })}
-            className={`px-4 py-2 cursor-pointer  ${
+            className={`px-4 py-2 cursor-pointer rounded  ${
               highlightedIndex === index
-                ? "bg-gray-100 dark:bg-gray-100"
+                ? "bg-gray-100 dark:bg-gray-100 text-slate-700 dark:text-slate-700"
                 : "bg-transparent"
             } dark:text-white
               dark:hover:bg-gray-100 dark:hover:text-slate-700
-              hover:bg-gray-200 hover:text-slate-700 `}
+              hover:bg-gray-100 hover:text-slate-700 `}
           >
             {item}
           </List.Item>
