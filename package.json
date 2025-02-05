@@ -16,15 +16,19 @@
   "description": "Text-to-speech service leveraging the Read Aloud API from Microsoft Edge. Select text on any webpage and listen to it read aloud in a natural voice. Or, listen to the entire page.",
   "dependencies": {
     "@chakra-ui/react": "^3.7.0",
+    "downshift": "^9.0.8",
     "edge-tts-client": "^1.0.2",
     "lucide-react": "^0.460.0",
+    "next-themes": "^0.4.4",
     "react": "^18.3.1",
-    "react-dom": "^18.3.1"
+    "react-dom": "^18.3.1",
+    "react-icons": "^5.4.0"
   },
   "devDependencies": {
     "@babel/core": "^7.26.0",
     "@babel/preset-env": "^7.26.0",
     "@babel/preset-react": "^7.25.9",
+    "@chakra-ui/cli": "^3.7.0",
     "@types/chrome": "^0.0.283",
     "@types/node": "^22.9.1",
     "@types/react": "^18.3.12",

@@ -1,50 +1,39 @@
 // src/popup/index.tsx
 import React, { useState, useEffect } from 'react';
 import { createRoot } from 'react-dom/client';
+import { Provider } from "../components/ui/provider"
+import { Input } from "@chakra-ui/react"
 import './styles.css';
-import { MoonIcon, SunIcon } from 'lucide-react';
-
-// Top voices to be displayed in the dropdown
-const TOP_VOICES = [
-  'en-US-AndrewNeural',
-  'en-US-AriaNeural',
-  'en-US-AvaNeural',
-  'en-US-ChristopherNeural',
-  'en-US-SteffanNeural',
-  'en-IE-ConnorNeural',
-  'en-GB-RyanNeural',
-  'en-GB-SoniaNeural',
-  'en-AU-NatashaNeural',
-  'en-AU-WilliamNeural',
-];
+import { EdgeTTSClient } from "edge-tts-client";
+import SearchableDropdown from '../components/ui/searchableDropdown';
+import { ColorModeButton } from '../components/ui/color-mode';
+ 
 
 function Popup() {
-  const voices = TOP_VOICES;
+  const [voices, setVoices] = useState([]);
   const [selectedVoice, setSelectedVoice] = useState<string>('en-US-ChristopherNeural');
   const [customVoice, setCustomVoice] = useState<string>('');
   const [speed, setSpeed] = useState<number>(1.2);
 
-  const [darkMode, setDarkMode] = useState<boolean>(false);
 
-  useEffect(() => {
+    useEffect( () => {
+    const fetchVoices = async () => {
+      const tts = new EdgeTTSClient();
+      const voices = await tts.getVoices();
+      setVoices(voices);
+    };
+
+    fetchVoices();
     // Load saved settings
-    chrome.storage.sync.get(['voiceName', 'speed', 'customVoice', 'darkMode'], (result) => {
+    chrome.storage.sync.get(['voiceName', 'speed', 'customVoice'], (result) => {
       if (result.voiceName) {
         setSelectedVoice(result.voiceName);
       }
       if (result.speed) {
         setSpeed(result.speed);
       }
-
       if (result.customVoice) {
         setCustomVoice(result.customVoice);
-      }
-
-      if (result.darkMode) {
-        setDarkMode(result.darkMode || false);
-        document.documentElement.classList.toggle('dark', result.darkMode || false);
-
-        // setDarkMode(result.darkMode)
       }
     });
   }, []);
@@ -64,12 +53,7 @@ function Popup() {
     chrome.storage.sync.set({ speed: newSpeed });
   };
 
-  const handleDarkModeToggle = () => {
-    const newDarkMode = !darkMode;
-    setDarkMode(newDarkMode);
-    document.documentElement.classList.toggle('dark', newDarkMode);
-    chrome.storage.sync.set({ darkMode: newDarkMode });
-  };
+
 
   const handlePlayClick = () => {
     chrome.tabs.query({ active: true, currentWindow: true }, (tabs: chrome.tabs.Tab[]) => {
@@ -108,32 +92,20 @@ function Popup() {
   };
 
   return (
+    <Provider>
     <div className="p-4 w-80 bg-white dark:bg-gray-800 dark:text-white transition-colors">
-      <div
-        className="w-8 h-8 fixed top-2 right-0 cursor-pointer"
-        onClick={() => handleDarkModeToggle()}
-      >
-        {darkMode ? <MoonIcon /> : <SunIcon />}
-      </div>
+     <ColorModeButton />
       <h1 className="text-xl font-bold select-none">Edge TTS Extension</h1>
 
       <div className="mt-4">
 
         <label className="block">Select Voice:</label>
-        <select
-          className="w-full mt-1 p-2 border rounded dark:bg-slate-700 dark:border-slate-500 outline-none ring-0"
-          value={selectedVoice}
-          // onChange={(e) => setSelectedVoice(e.target.value)}
-          onChange={(e) => handleVoiceChange(e.target.value)}
-        >
-          {voices.map((voice) => (
-            <option key={voice} value={voice}>
-              {voice}
-            </option>
-          ))}
-        </select>
+        
+
+        <SearchableDropdown onChange={handleVoiceChange} />
+
         <label className="block mt-4">Or enter custom voice:</label>
-        <input
+        <Input
           type="text"
           className="w-full mt-1 p-2 border rounded dark:bg-slate-700 dark:border-slate-500 outline-none ring-0"
           placeholder="Custom voice name"
@@ -168,13 +140,14 @@ function Popup() {
         <>
           <button
             onClick={() => handlePlayClick()}
-            className="px-4 py-2 bg-blue-500 text-white rounded"
+            className="px-4 py-2  bg-blue-500 text-white rounded"
           >
             Read current page aloud
           </button>
         </>
       </div>
     </div>
+    </Provider>
   );
 }
 
