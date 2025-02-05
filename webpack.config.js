@@ -2,7 +2,7 @@
 const path = require("path");
 const CopyWebpackPlugin = require("copy-webpack-plugin");
 
-const cspProd = "script-src 'self';";
+const cspProd = "script-src 'self'; object-src 'self';";
 
 module.exports = {
   mode: "production",
