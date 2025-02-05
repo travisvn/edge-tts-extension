@@ -2,8 +2,12 @@
 const path = require("path");
 const CopyWebpackPlugin = require("copy-webpack-plugin");
 
+const cspDev = "script-src 'self' 'unsafe-eval' 'wasm-unsafe-eval' http://localhost:*;";
+
+
 module.exports = {
   mode: "development",
+  devtool:'source-map',
   entry: {
     popup: "./src/popup/index.tsx",
     background: "./src/background/index.ts",
@@ -30,7 +34,16 @@ module.exports = {
   plugins: [
     new CopyWebpackPlugin({
       patterns: [
-        { from: "manifest.json", to: "." },
+        {
+          from: "manifest.json",
+          to: ".",
+          transform(content) {
+            return content.toString().replace(
+              "__CSP_POLICY__",
+              cspDev
+            );
+          },
+        },
         { from: "src/popup/index.html", to: "popup/index.html" },
         { from: "icons", to: "icons" },
       ],
