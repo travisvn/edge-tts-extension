@@ -2,7 +2,7 @@
   "name": "edge-tts-chrome-extension",
   "version": "1.0.2",
   "scripts": {
-    "dev": "webpack --mode development",
+    "dev": "webpack --config webpack.dev.config.js",
     "build": "webpack --mode production",
     "start": "webpack --watch --mode development"
   },
@@ -15,6 +15,7 @@
   "license": "GPL-3.0",
   "description": "Text-to-speech service leveraging the Read Aloud API from Microsoft Edge. Select text on any webpage and listen to it read aloud in a natural voice. Or, listen to the entire page.",
   "dependencies": {
+    "@chakra-ui/react": "^3.7.0",
     "edge-tts-client": "^1.0.2",
     "lucide-react": "^0.460.0",
     "react": "^18.3.1",
