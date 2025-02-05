@@ -2,13 +2,10 @@
 const path = require("path");
 const CopyWebpackPlugin = require("copy-webpack-plugin");
 
-const cspProd = "script-src 'self'; object-src 'self';";
-
 module.exports = {
   mode: "production",
-  // mode: 'development',
   entry: {
-    popup: "./src/popup/index.tsx",
+    popup: "./src/popup/index.tx",
     background: "./src/background/index.ts",
     contentScript: "./src/contentScript.ts",
   },
@@ -32,16 +29,7 @@ module.exports = {
   plugins: [
     new CopyWebpackPlugin({
       patterns: [
-        {
-          from: "manifest.json",
-          to: ".",
-          transform(content) {
-            return content.toString().replace(
-              "__CSP_POLICY__",
-              cspProd
-            );
-          },
-        },
+        {from: "manifest.json",to: ".",},
         { from: "src/popup/index.html", to: "popup/index.html" },
         { from: "icons", to: "icons" },
       ],
