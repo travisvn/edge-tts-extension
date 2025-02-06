@@ -2,6 +2,7 @@ import React, { useState, useRef, useEffect } from "react";
 import { Box, Input, List } from "@chakra-ui/react";
 import { useCombobox } from "downshift";
 import { EdgeTTSClient } from "edge-tts-client";
+import FuzzySearch from 'fuzzy-search';
 
 const TOP_VOICES = [
   'en-US-AndrewNeural',
@@ -37,6 +38,11 @@ export default function SearchableDropdown({ onSelectItemChange, onInputChange }
       setOriginalVoices(sortedVoicesArray);
     });
   }, []);
+
+  const search = new FuzzySearch(originalVoices, [], {
+    caseSensitive: false,
+    sort: true,
+  });
   
   const {
     isOpen,
@@ -50,9 +56,7 @@ export default function SearchableDropdown({ onSelectItemChange, onInputChange }
     initialSelectedItem: inputItems[0],
     onInputValueChange: ({ inputValue }) => {
       setInputItems(
-        originalVoices.filter((item) =>
-          item.toLowerCase().includes(inputValue?.toLowerCase() || "")
-        )
+        search.search(inputValue)
       );
       onInputChange(inputValue);
     },
@@ -60,7 +64,7 @@ export default function SearchableDropdown({ onSelectItemChange, onInputChange }
       onSelectItemChange(selectedItem);
 
       setTimeout(() => {
-        setInputItems(originalVoices)
+        setInputItems(inputItems)
       }, 300); 
     },
   });
@@ -88,26 +92,19 @@ export default function SearchableDropdown({ onSelectItemChange, onInputChange }
         placeholder="Search or Input Custom Voice"
         className="w-full mt-1 p-2 border rounded bg-white text-black dark:bg-gray-700 dark:text-white dark:border-gray-600 outline-none ring-0"
       />
-      <div className='text-xs text-slate-400 py-2 font-light'>
-        Sample voices at{' '}
-        <a
-          href='https://tts.travisvn.com'
-          target='_blank'
-          className='underline'
-        >
-          tts.travisvn.com
-        </a>
-      </div>
+     
 
       {/* Dropdown List */}
       <List.Root
         {...getMenuProps()}
-        className={`absolute transition-all duration-300 w-full mt-1 p-2 border border-gray-300 bg-white dark:bg-slate-700 dark:border-gray-700 shadow-md rounded-md z-30
-           outline-none ring-0 max-h-[200px] overflow-y-auto
+        className={`absolute transition-all duration-300 w-full mt-1 border border-gray-300 bg-white dark:bg-slate-700 dark:border-gray-700 shadow-md rounded-md z-30
+           outline-none ring-0
           ${isOpen ? 'block' : 'hidden'}
           flex flex-col gap-2 py-2`}
       >
-        {inputItems.length > 0 ? inputItems.map((item, index) => (
+       <Box className="px-2 max-h-[200px] overflow-y-auto">
+
+       {inputItems.length > 0 ? inputItems.map((item, index) => (
           <List.Item
             key={item}
             {...getItemProps({ item, index })}
@@ -122,7 +119,18 @@ export default function SearchableDropdown({ onSelectItemChange, onInputChange }
           </List.Item>
         )) : <List.Item className="px-4 py-2 rounded  bg-transparent text-slate-400 dark:text-slate-400">
           No voices found</List.Item>}
+       </Box>
       </List.Root>
+      <div className='text-xs text-slate-400 py-2 font-light'>
+        Sample voices at{' '}
+        <a
+          href='https://tts.travisvn.com'
+          target='_blank'
+          className='underline'
+        >
+          tts.travisvn.com
+        </a>
+      </div>
     </Box>
   );
 }
