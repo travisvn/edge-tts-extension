@@ -15,8 +15,11 @@ const TOP_VOICES = [
   'en-AU-NatashaNeural',
   'en-AU-WilliamNeural',
 ];
-
-export default function SearchableDropdown({ onChange }: { onChange: (voice: string) => void }) {
+interface SearchableDropdownProps {
+  onSelectItemChange: (item: string) => void;
+  onInputChange: (input: string) => void;
+}
+export default function SearchableDropdown({ onSelectItemChange, onInputChange }: SearchableDropdownProps) {
   const [inputItems, setInputItems] = useState(TOP_VOICES);
   const [originalVoices, setOriginalVoices] = useState([]);
   
@@ -24,8 +27,14 @@ export default function SearchableDropdown({ onChange }: { onChange: (voice: str
     const client = new EdgeTTSClient();
     client.getVoices().then((voices) => {
       const voicesArray = voices.map((voice) => voice.ShortName);
-      setInputItems(voicesArray);
-      setOriginalVoices(voicesArray);
+      // Sort voices to have 'en-US' prefixed voices at the front
+      const sortedVoicesArray = voicesArray.sort((a, b) => {
+        if (a.startsWith('en-US') && !b.startsWith('en-US')) return -1;
+        if (!a.startsWith('en-US') && b.startsWith('en-US')) return 1;
+        return 0;
+      });
+      setInputItems(sortedVoicesArray);
+      setOriginalVoices(sortedVoicesArray);
     });
   }, []);
   
@@ -38,19 +47,38 @@ export default function SearchableDropdown({ onChange }: { onChange: (voice: str
     selectItem,
   } = useCombobox({
     items: inputItems,
+    initialSelectedItem: inputItems[0],
     onInputValueChange: ({ inputValue }) => {
       setInputItems(
-        inputItems.filter((item) =>
+        originalVoices.filter((item) =>
           item.toLowerCase().includes(inputValue?.toLowerCase() || "")
         )
       );
-      onChange(inputValue);
+      onInputChange(inputValue);
     },
-    onSelectedItemChange: () => {
-      setTimeout(() => setInputItems(originalVoices), 300); 
+    onSelectedItemChange: ({ selectedItem }) => {
+      onSelectItemChange(selectedItem);
+
+      setTimeout(() => {
+        setInputItems(originalVoices)
+      }, 300); 
     },
   });
- ;
+
+
+  useEffect( () => {
+   
+    // Load saved settings
+    chrome.storage.sync.get(['voiceName', 'customVoice'], (result) => {
+      if (result.voiceName) {
+        selectItem(result.voiceName);
+      }
+      if (result.customVoice) {
+        selectItem(result.customVoice);
+      }
+    });
+    
+  }, []);
 
   return (
     <Box className="relative">
@@ -58,20 +86,29 @@ export default function SearchableDropdown({ onChange }: { onChange: (voice: str
       <Input
         {...getInputProps()}
         defaultValue={'a'}
-        placeholder="Search & Select"
+        placeholder="Search or Input Custom Voice"
         className="w-full mt-1 p-2 border rounded bg-white text-black dark:bg-gray-700 dark:text-white dark:border-gray-600 outline-none ring-0"
       />
+      <div className='text-xs text-slate-400 py-2 font-light'>
+        Sample voices at{' '}
+        <a
+          href='https://tts.travisvn.com'
+          target='_blank'
+          className='underline'
+        >
+          tts.travisvn.com
+        </a>
+      </div>
 
       {/* Dropdown List */}
       <List.Root
         {...getMenuProps()}
-
         className={`absolute transition-all duration-300 w-full mt-1 p-2 border border-gray-300 bg-white dark:bg-slate-700 dark:border-gray-700 shadow-md rounded-md z-30
            outline-none ring-0 max-h-[200px] overflow-y-auto
           ${isOpen ? 'block' : 'hidden'}
-          flex flex-col gap-2`}
+          flex flex-col gap-2 py-2`}
       >
-        {inputItems.map((item, index) => (
+        {inputItems.length > 0 ? inputItems.map((item, index) => (
           <List.Item
             key={item}
             {...getItemProps({ item, index })}
@@ -85,7 +122,8 @@ export default function SearchableDropdown({ onChange }: { onChange: (voice: str
           >
             {item}
           </List.Item>
-        ))}
+        )) : <List.Item className="px-4 py-2 rounded  bg-transparent text-slate-400 dark:text-slate-400">
+          No voices found</List.Item>}
       </List.Root>
     </Box>
   );

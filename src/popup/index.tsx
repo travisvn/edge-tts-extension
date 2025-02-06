@@ -10,41 +10,26 @@ import { ColorModeButton } from '../components/ui/color-mode';
  
 
 function Popup() {
-  const [voices, setVoices] = useState([]);
-  const [selectedVoice, setSelectedVoice] = useState<string>('en-US-ChristopherNeural');
   const [customVoice, setCustomVoice] = useState<string>('');
   const [speed, setSpeed] = useState<number>(1.2);
 
 
     useEffect( () => {
-    const fetchVoices = async () => {
-      const tts = new EdgeTTSClient();
-      const voices = await tts.getVoices();
-      setVoices(voices);
-    };
-
-    fetchVoices();
+   
     // Load saved settings
-    chrome.storage.sync.get(['voiceName', 'speed', 'customVoice'], (result) => {
-      if (result.voiceName) {
-        setSelectedVoice(result.voiceName);
-      }
+    chrome.storage.sync.get(['voiceName', 'speed'], (result) => {
       if (result.speed) {
         setSpeed(result.speed);
-      }
-      if (result.customVoice) {
-        setCustomVoice(result.customVoice);
       }
     });
   }, []);
 
   const handleVoiceChange = (voice) => {
-    setSelectedVoice(voice);
     chrome.storage.sync.set({ voiceName: voice });
   };
 
   const handleCustomVoiceChange = (customVoice) => {
-    setCustomVoice(customVoice);
+  console.log('customVoice :', customVoice);
     chrome.storage.sync.set({ customVoice: customVoice });
   };
 
@@ -63,6 +48,7 @@ function Popup() {
           {
             target: { tabId: tab.id },
             func: () => {
+              console.log('executing script',document.body.innerText);
               return document.body.innerText;
             },
           },
@@ -102,27 +88,11 @@ function Popup() {
         <label className="block">Select Voice:</label>
         
 
-        <SearchableDropdown onChange={handleVoiceChange} />
+        <SearchableDropdown onSelectItemChange={handleVoiceChange} onInputChange={handleCustomVoiceChange} />
 
-        <label className="block mt-4">Or enter custom voice:</label>
-        <Input
-          type="text"
-          className="w-full mt-1 p-2 border rounded dark:bg-slate-700 dark:border-slate-500 outline-none ring-0"
-          placeholder="Custom voice name"
-          value={customVoice}
-          onChange={(e) => handleCustomVoiceChange(e.target.value)}
-        />
+       
       </div>
-      <div className='text-center mt-4 text-base font-light'>
-        Sample voices at{' '}
-        <a
-          href='https://tts.travisvn.com'
-          target='_blank'
-          className='underline'
-        >
-          tts.travisvn.com
-        </a>
-      </div>
+      
       <div className="mt-4">
         <label className="block">Speed: {speed}x</label>
         <input
