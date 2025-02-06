@@ -74,6 +74,7 @@ export const ColorModeButton = React.forwardRef<
         aria-label="Toggle color mode"
         size="sm"
         ref={ref}
+        className="bg-transparent"
         {...props}
         css={{
           _icon: {

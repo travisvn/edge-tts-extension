@@ -85,7 +85,6 @@ export default function SearchableDropdown({ onSelectItemChange, onInputChange }
       {/* Input Field */}
       <Input
         {...getInputProps()}
-        defaultValue={'a'}
         placeholder="Search or Input Custom Voice"
         className="w-full mt-1 p-2 border rounded bg-white text-black dark:bg-gray-700 dark:text-white dark:border-gray-600 outline-none ring-0"
       />
@@ -115,10 +114,9 @@ export default function SearchableDropdown({ onSelectItemChange, onInputChange }
             className={`px-4 py-2 cursor-pointer rounded  ${
               highlightedIndex === index
                 ? "bg-gray-100 dark:bg-gray-100 text-slate-700 dark:text-slate-700"
-                : "bg-transparent"
-            } dark:text-white
-              dark:hover:bg-gray-100 dark:hover:text-slate-700
-              hover:bg-gray-100 hover:text-slate-700 `}
+                : `bg-transparent dark:text-white   dark:hover:bg-gray-100 dark:hover:text-slate-700
+              hover:bg-gray-100 hover:text-slate-700`
+            }  transition-all duration-300`}
           >
             {item}
           </List.Item>
