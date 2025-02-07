@@ -45,6 +45,8 @@ export async function readText(text:string, settings: ReadTextSettings = {
   speed: 1.2,
 }) {
   cleanup();
+  chrome.runtime.sendMessage({ action: "controlPanel:create" });
+  
   try {
     // const settings = await chrome.storage.sync.get();
 
@@ -63,8 +65,6 @@ export async function readText(text:string, settings: ReadTextSettings = {
       let sourceBuffer: SourceBuffer;
       const chunks: Uint8Array[] = [];
       let isFirstChunk = true;
-
-      chrome.runtime.sendMessage({ action: "controlPanel:create" });
 
       if (!audioElement) {
         audioElement = new Audio();
@@ -111,8 +111,9 @@ export async function readText(text:string, settings: ReadTextSettings = {
         }
       };
 
-      chrome.runtime.sendMessage({ action: "controlPanel:updateLoading", isLoading: false });
+      
       mediaSource.addEventListener("sourceopen", () => {
+        chrome.runtime.sendMessage({ action: "controlPanel:updateLoading", isLoading: false });
         try {
           sourceBuffer = mediaSource.addSourceBuffer(
             'audio/webm; codecs="opus"'
@@ -131,7 +132,7 @@ export async function readText(text:string, settings: ReadTextSettings = {
           stream.on("end", () => {
             const checkAndEndStream = () => {
               if (chunks.length === 0 && !sourceBuffer.updating) {
-                mediaSource.endOfStream();
+                mediaSource?.endOfStream();
                 resolve(void 0);
               } else {
                 setTimeout(checkAndEndStream, 100);

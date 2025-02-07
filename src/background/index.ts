@@ -112,7 +112,7 @@ chrome.commands.onCommand.addListener(async (command) => {
               settings
             });
           } else {
-            console.log("No text selected.");
+            console.warn("No text selected.");
           }
         })
         .catch((error) => console.error("Error executing script:", error));
@@ -126,7 +126,6 @@ chrome.runtime.onMessage.addListener(async (message, sender, sendResponse) => {
   if (message.action === "offscreen:readPage") {
     grabAndReadPage();
   } else if (message.action === "offscreen:togglePause") {
-    console.log("Received pause toggle:", message.isPaused);
     chrome.runtime.sendMessage({
       type: 'togglePause',
       target: 'offscreen',
@@ -151,13 +150,8 @@ chrome.runtime.onMessage.addListener(async (message, sender, sendResponse) => {
     }
 
     const tabId = tabs[0].id;
-    console.log('tabId :', tabId);
-    if (message.action === 'controlPanel:updatePause') {
-      chrome.tabs.sendMessage(tabId, {
-        action: 'controlPanel:updatePause',
-        isPaused: message.isPaused
-      });
-    } else if (message.action === 'controlPanel:remove') {
+
+   if (message.action === 'controlPanel:remove') {
       chrome.tabs.sendMessage(tabId, {
         action: 'controlPanel:remove',
       });

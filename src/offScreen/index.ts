@@ -20,11 +20,6 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       audioElement?.play();
     }
 
-    chrome.runtime.sendMessage({
-      action: "controlPanel:updatePause",
-      isPaused: !!message?.isPaused,
-    });
-
   }
 });
 

@@ -7,17 +7,42 @@ import {
 import { circlePause, circlePlay } from "./lib/svgs";
 
 
-let controlPanel = null;
 window.onClickTogglePause = onClickTogglePause;
 window.onClickStopPlayback = onClickStopPlayback;
+
+
+
+function removeControlPanel() {
+  const controlPanel = document.getElementById('tts-control-panel');
+  if (controlPanel && controlPanel.parentNode) {
+    controlPanel.parentNode.removeChild(controlPanel);
+  }
+}
+
+
+function onClickTogglePause() {
+  let panel = document.getElementById('tts-control-panel')
+  if (!panel) {
+    console.warn('panel not found');
+    return;
+  };
+  const isPaused = panel.dataset.isPaused === 'true';
+  panel.dataset.isPaused = `${!isPaused}`;
+  updatePlayPauseButton(!isPaused);
+  chrome.runtime.sendMessage({ action: "offscreen:togglePause",isPaused: !isPaused });
+}
+
+function onClickStopPlayback() {
+  chrome.runtime.sendMessage({ action: "offscreen:stopPlayback" });
+}
 
 function updatePlayPauseButton(isPaused: boolean) {
   const pauseButton = document.querySelector("#tts-pause");
   if (pauseButton) {
     const buttonText =
-      isPaused ? "Pause" : "Resume";
+      isPaused ?  "Resume" : "Pause";
     pauseButton.innerHTML = `
-      ${isPaused ? circlePause : circlePlay}
+      ${isPaused ? circlePlay : circlePause}
       <span>
         ${buttonText}
       </span>
@@ -25,33 +50,10 @@ function updatePlayPauseButton(isPaused: boolean) {
   }
 }
 
-function removeControlPanel() {
-  if (controlPanel && controlPanel.parentNode) {
-    controlPanel.parentNode.removeChild(controlPanel);
-  }
-  controlPanel = null;
-}
-
-
-function onClickTogglePause() {
-  chrome.runtime.sendMessage({ action: "offscreen:togglePause" });
-}
-
-function onClickStopPlayback() {
-  chrome.runtime.sendMessage({ action: "offscreen:stopPlayback" });
-}
-
-
 chrome.runtime.onMessage.addListener(async (request, sender, sendResponse) => {
-  console.log('request_ content script:', request);
-
-  if (request.action === "controlPanel:updatePause") {
-    updatePlayPauseButton(request.isPaused);
-  }
 
   if (request.action === "controlPanel:updateLoading") {
-    console.log('before updating controlPanel :', controlPanel);
-    updatePanelContent(controlPanel, request.isLoading);
+    updatePanelContent(request.isLoading);
   }
   
   if (request.action === "controlPanel:remove") {
@@ -59,8 +61,7 @@ chrome.runtime.onMessage.addListener(async (request, sender, sendResponse) => {
   }
 
   if (request.action === "controlPanel:create") {
-    controlPanel = await createControlPanel(true);
-    console.log('controlPanel :', controlPanel);
+    await createControlPanel(true);
   }
 
 

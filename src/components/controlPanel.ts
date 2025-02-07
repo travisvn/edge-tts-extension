@@ -5,23 +5,40 @@ export async function createControlPanel(isLoading = true) {
 		darkMode: false,
 	});
 
+	let existingPanel = document.getElementById('tts-control-panel')
+	if(existingPanel){
+		if (settings.darkMode) {
+			existingPanel.dataset.theme = 'dark';
+		}
+		return existingPanel;
+	}
+
 	const panel = document.createElement('div');
 	panel.className = 'tts-controls';
 	panel.id = 'tts-control-panel';
+	panel.dataset.isLoading = `${isLoading}`;
 
 	if (settings.darkMode) {
 		panel.dataset.theme = 'dark';
-		// panel.className += ' dark';
 	}
 
-	updatePanelContent(panel, isLoading);
 	document.body.appendChild(panel);
+	updatePanelContent(isLoading);
 	return panel;
 }
 
-export function updatePanelContent(panel, isLoading) {
+export async function updatePanelContent(isLoading = true) {
+
+	let panel = document.getElementById('tts-control-panel')
+ console.log('panel when update:', panel);
+
+	if (!panel) {
+		panel = await createControlPanel(true)
+	}
+
+	panel.dataset.isLoading = `${isLoading}`;
 	panel.innerHTML = `
-		${isLoading ? `
+		${panel.dataset.isLoading==='true' ? `
 			<div class="flex-center loading-container">
 				<span>Generating audio...</span>
 				<div class="loading-spinner"></div>
