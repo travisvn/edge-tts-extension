@@ -30,7 +30,6 @@ export async function createControlPanel(isLoading = true) {
 export async function updatePanelContent(isLoading = true) {
 
 	let panel = document.getElementById('tts-control-panel')
- console.log('panel when update:', panel);
 
 	if (!panel) {
 		panel = await createControlPanel(true)
