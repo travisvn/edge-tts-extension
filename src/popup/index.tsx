@@ -33,44 +33,10 @@ function Popup() {
     chrome.storage.sync.set({ speed: newSpeed });
   };
 
-  const handlePlayClick = () => {
-    chrome.tabs.query(
-      { active: true, currentWindow: true },
-      (tabs: chrome.tabs.Tab[]) => {
-        const tab = tabs[0];
-        if (tab && tab.id) {
-          chrome.scripting.executeScript(
-            {
-              target: { tabId: tab.id },
-              func: () => {
-                console.log("executing script", document.body.innerText);
-                return document.body.innerText;
-              },
-            },
-            (injectionResults) => {
-              if (chrome.runtime.lastError) {
-                console.error(chrome.runtime.lastError);
-                return;
-              }
-              for (const frameResult of injectionResults) {
-                const pageContent = frameResult.result as string;
-                if (pageContent && pageContent.trim() !== "") {
-                  // handlePlay(pageContent);
-                  chrome.tabs.sendMessage(tab.id, {
-                    action: "readText",
-                    text: pageContent,
-                  });
-                } else {
-                  console.warn("The page content is empty.");
-                }
-              }
-            }
-          );
-        } else {
-          console.error("No active tab found");
-        }
-      }
-    );
+  const handlePlayClick = async () => {
+    chrome.runtime.sendMessage({
+      action: 'offscreen:readPage',
+    });
   };
 
   return (

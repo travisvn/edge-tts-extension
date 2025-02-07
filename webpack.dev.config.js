@@ -9,6 +9,7 @@ module.exports = {
     popup: "./src/popup/index.tsx",
     background: "./src/background/index.ts",
     contentScript: "./src/contentScript.ts",
+    offScreen: "./src/offScreen/index.ts",
   },
   output: {
     path: path.resolve(__dirname, "dist"),
@@ -34,6 +35,7 @@ module.exports = {
         {from: "manifest.json",to: ".",},
         { from: "src/popup/index.html", to: "popup/index.html" },
         { from: "icons", to: "icons" },
+        { from: "src/offScreen/off-screen.html", to: "offScreen/off-screen.html" },
       ],
     }),
   ],

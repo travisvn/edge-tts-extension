@@ -30,7 +30,8 @@
     "contextMenus",
     "activeTab",
     "scripting",
-    "storage"
+    "storage",
+    "offscreen"
   ],
   "content_scripts": [
     {

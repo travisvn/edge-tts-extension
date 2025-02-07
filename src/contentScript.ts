@@ -34,19 +34,24 @@ function removeControlPanel() {
 
 
 function onClickTogglePause() {
-  chrome.runtime.sendMessage({ action: "background:togglePause" });
+  chrome.runtime.sendMessage({ action: "offscreen:togglePause" });
 }
 
 function onClickStopPlayback() {
-  chrome.runtime.sendMessage({ action: "background:stopPlayback" });
+  chrome.runtime.sendMessage({ action: "offscreen:stopPlayback" });
 }
 
 
 chrome.runtime.onMessage.addListener(async (request, sender, sendResponse) => {
+console.log('request_ content script:', request);
   if (request.action === "controlPanel:updatePause") {
     updatePlayPauseButton(request.isPaused);
   }
 
+  if (request.action === "controlPanel:updateLoading") {
+    updatePanelContent(controlPanel, request.isLoading);
+  }
+  
   if (request.action === "controlPanel:remove") {
     removeControlPanel();
   }
@@ -55,7 +60,5 @@ chrome.runtime.onMessage.addListener(async (request, sender, sendResponse) => {
     controlPanel = await createControlPanel(true);
   }
 
-  if (request.action === "controlPanel:updateLoading") {
-    updatePanelContent(controlPanel, request.isLoading);
-  }
+
 });
