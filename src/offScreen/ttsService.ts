@@ -121,8 +121,10 @@ export async function readText(text:string, settings: ReadTextSettings = {
           sourceBuffer.addEventListener("updateend", appendNextChunk);
 
           const stream = tts.toStream(text, prosodyOptions);
+          console.log('stream :', stream);
 
           stream.on("data", (data) => {
+          console.log('data :', data);
             if (data instanceof Uint8Array) {
               chunks.push(data);
               appendNextChunk();
