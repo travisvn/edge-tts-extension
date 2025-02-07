@@ -44,12 +44,14 @@ export function updatePanelContent(panel, isLoading) {
 		const pauseButton = panel.querySelector('#tts-pause');
 		const stopButton = panel.querySelector('#tts-stop');
 
-		if (pauseButton) pauseButton.addEventListener('click', () => {
-			window.togglePause?.();
-		});
+		if (pauseButton)
+			pauseButton.addEventListener("click", () => {
+				window.onClickTogglePause?.();
+			});
 
-		if (stopButton) stopButton.addEventListener('click', () => {
-			window.stopPlayback?.();
-		});
+		if (stopButton)
+			stopButton.addEventListener("click", () => {
+				window.onClickStopPlayback?.();
+			});
 	}
 }
