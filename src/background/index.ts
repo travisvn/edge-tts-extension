@@ -120,13 +120,12 @@ chrome.commands.onCommand.addListener(async (command) => {
   }
 });
 
+// Listener for messages to the offscreen document
 chrome.runtime.onMessage.addListener(async (message, sender, sendResponse) => {
-  
-  // forward messages to offscreen document
+
   if (message.action === "offscreen:readPage") {
-    grabAndReadPage()
-  }
-  else if (message.action === "offscreen:togglePause") {
+    grabAndReadPage();
+  } else if (message.action === "offscreen:togglePause") {
     console.log("Received pause toggle:", message.isPaused);
     chrome.runtime.sendMessage({
       type: 'togglePause',
@@ -140,24 +139,38 @@ chrome.runtime.onMessage.addListener(async (message, sender, sendResponse) => {
       target: 'offscreen',
     });
   }
-  // forward messages to content script
-  if (message.action ==='controlPanel:updatePause') {
-    chrome.runtime.sendMessage({
-      action: 'controlPanel:updatePause',
-      isPaused: message.isPaused
-    });
-  }else if (message.action ==='controlPanel:remove') {
-    chrome.runtime.sendMessage({
-      action: 'controlPanel:remove',
-    });
-  }else if (message.action ==='controlPanel:create') {
-    chrome.runtime.sendMessage({
-      action: 'controlPanel:create',
-    });
-  }else if (message.action ==='controlPanel:updateLoading') {
-    chrome.runtime.sendMessage({
-      action: 'controlPanel:updateLoading',
-      isLoading: message.isLoading
-    });
-  }
+});
+
+// Listener for messages to the content script
+chrome.runtime.onMessage.addListener(async (message, sender, sendResponse) => {
+
+  chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
+    if (!tabs || tabs.length === 0 || !tabs[0].id) {
+      console.error("No active tab found.");
+      return;
+    }
+
+    const tabId = tabs[0].id;
+    console.log('tabId :', tabId);
+    if (message.action === 'controlPanel:updatePause') {
+      chrome.tabs.sendMessage(tabId, {
+        action: 'controlPanel:updatePause',
+        isPaused: message.isPaused
+      });
+    } else if (message.action === 'controlPanel:remove') {
+      chrome.tabs.sendMessage(tabId, {
+        action: 'controlPanel:remove',
+      });
+    } else if (message.action === 'controlPanel:create') {
+      chrome.tabs.sendMessage(tabId, {
+        action: 'controlPanel:create',
+      });
+    } else if (message.action === 'controlPanel:updateLoading') {
+      chrome.tabs.sendMessage(tabId, {
+        action: 'controlPanel:updateLoading',
+        isLoading: message.isLoading
+      });
+    }
+  });
+ 
 });

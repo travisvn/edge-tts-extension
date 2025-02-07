@@ -43,12 +43,14 @@ function onClickStopPlayback() {
 
 
 chrome.runtime.onMessage.addListener(async (request, sender, sendResponse) => {
-console.log('request_ content script:', request);
+  console.log('request_ content script:', request);
+
   if (request.action === "controlPanel:updatePause") {
     updatePlayPauseButton(request.isPaused);
   }
 
   if (request.action === "controlPanel:updateLoading") {
+    console.log('before updating controlPanel :', controlPanel);
     updatePanelContent(controlPanel, request.isLoading);
   }
   
@@ -58,6 +60,7 @@ console.log('request_ content script:', request);
 
   if (request.action === "controlPanel:create") {
     controlPanel = await createControlPanel(true);
+    console.log('controlPanel :', controlPanel);
   }
 
 
