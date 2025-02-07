@@ -3,7 +3,8 @@ const path = require("path");
 const CopyWebpackPlugin = require("copy-webpack-plugin");
 
 module.exports = {
-  mode: "production",
+  mode: "development",
+  devtool:'inline-source-map',
   entry: {
     popup: "./src/popup/index.tsx",
     background: "./src/background/index.ts",
@@ -12,7 +13,8 @@ module.exports = {
   },
   output: {
     path: path.resolve(__dirname, "dist"),
-    filename: "[name]/bundle.js", // Outputs files like dist/popup/bundle.js
+    filename: "[name]/bundle.js", // Outputs files like dist/popup/bundle.js,
+    clean:true
   },
   module: {
     rules: [
@@ -40,4 +42,11 @@ module.exports = {
   resolve: {
     extensions: [".ts", ".tsx", ".js", ".jsx"],
   },
+  devServer: {
+    static: path.join(__dirname, "dist"),
+    compress: true,
+    hot: true,
+    port: 3000, 
+  },
+  watch: true, 
 };

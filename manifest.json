@@ -18,11 +18,20 @@
     "https://speech.platform.bing.com/*",
     "wss://speech.platform.bing.com/*"
   ],
+  "commands": {
+    "read-selected-text": {
+      "suggested_key": {
+        "default": "Alt+V"
+      },
+      "description": "Read selected text"
+    }
+  },
   "permissions": [
     "contextMenus",
     "activeTab",
     "scripting",
-    "storage"
+    "storage",
+    "offscreen"
   ],
   "content_scripts": [
     {
