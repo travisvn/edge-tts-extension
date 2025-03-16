@@ -71,7 +71,7 @@ function Popup() {
     chrome.storage.sync.set({ darkMode: newDarkMode });
   };
 
-  const handlePlayClick = () => {
+  const handlePlayClick2 = () => {
     chrome.tabs.query({ active: true, currentWindow: true }, (tabs: chrome.tabs.Tab[]) => {
       const tab = tabs[0];
       if (tab && tab.id) {
@@ -104,6 +104,12 @@ function Popup() {
       } else {
         console.error('No active tab found');
       }
+    });
+  };
+
+  const handlePlayClick = async () => {
+    chrome.runtime.sendMessage({
+      action: 'offscreen:readPage',
     });
   };
 

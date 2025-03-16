@@ -3,7 +3,7 @@
   "version": "1.0.2",
   "scripts": {
     "dev": "webpack --mode development",
-    "build": "webpack --mode production",
+    "build": "webpack --config webpack.config.js --mode production",
     "start": "webpack --watch --mode development"
   },
   "keywords": [
