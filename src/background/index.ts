@@ -1,5 +1,42 @@
 import { setupOffscreenDocument } from "../offScreen/setup";
 
+// Track if we're currently setting up
+let isSettingUp = false;
+let messageQueue = [];
+
+// Setup function that ensures messages are processed after setup
+async function ensureOffscreenAndProcess(message) {
+  if (isSettingUp) {
+    // Queue the message if we're currently setting up
+    messageQueue.push(message);
+    return;
+  }
+
+  isSettingUp = true;
+
+  try {
+    // Setup offscreen document
+    await setupOffscreenDocument('offScreen/off-screen.html');
+
+    // Process the current message
+    processMessage(message);
+
+    // Process any queued messages
+    while (messageQueue.length > 0) {
+      const queuedMessage = messageQueue.shift();
+      processMessage(queuedMessage);
+    }
+  } finally {
+    isSettingUp = false;
+  }
+}
+
+// Process a message by sending it to the offscreen document
+function processMessage(message) {
+  console.log("[Background] Processing message:", message);
+  chrome.runtime.sendMessage(message);
+}
+
 // 🌟 Register Context Menus
 chrome.runtime.onInstalled.addListener(() => {
   chrome.contextMenus.create({
@@ -17,8 +54,6 @@ chrome.runtime.onInstalled.addListener(() => {
 
 // 🌟 Function to Read Full Page
 export async function grabAndReadPage() {
-  await setupOffscreenDocument('offScreen/off-screen.html');
-
   chrome.tabs.query({ active: true, currentWindow: true }, async (tabs) => {
     if (!tabs || tabs.length === 0 || !tabs[0].id) return;
 
@@ -37,7 +72,7 @@ export async function grabAndReadPage() {
         const pageContent = results[0].result;
         console.log("[Background] Sending page content to offscreen.");
 
-        chrome.runtime.sendMessage({
+        ensureOffscreenAndProcess({
           type: "readText",
           target: "offscreen",
           data: pageContent,
@@ -62,9 +97,7 @@ chrome.contextMenus.onClicked.addListener(async (info, tab) => {
   });
 
   if (info.menuItemId === "readAloud" && info.selectionText) {
-    await setupOffscreenDocument('offScreen/off-screen.html');
-
-    chrome.runtime.sendMessage({
+    ensureOffscreenAndProcess({
       type: "readText",
       target: "offscreen",
       data: info.selectionText,
@@ -78,8 +111,6 @@ chrome.contextMenus.onClicked.addListener(async (info, tab) => {
 // 🌟 Handle Keyboard Shortcuts
 chrome.commands.onCommand.addListener(async (command) => {
   if (command === "read-selected-text") {
-    await setupOffscreenDocument('offScreen/off-screen.html');
-
     const settings = await chrome.storage.sync.get({
       voiceName: "en-US-ChristopherNeural",
       customVoice: "",
@@ -101,7 +132,7 @@ chrome.commands.onCommand.addListener(async (command) => {
             const selectedText = results[0].result;
             console.log("[Background] Sending selected text to offscreen.");
 
-            chrome.runtime.sendMessage({
+            ensureOffscreenAndProcess({
               type: "readText",
               target: "offscreen",
               data: selectedText,
@@ -116,31 +147,19 @@ chrome.commands.onCommand.addListener(async (command) => {
   }
 });
 
-// 🌟 Unified Message Listener (Handles Both Offscreen and UI Messages)
+// 🌟 Unified Message Listener
 chrome.runtime.onMessage.addListener(async (message, sender, sendResponse) => {
   console.log("[Background] Received message:", message);
 
-  // 🔹 Ensure offscreen document exists before sending messages
-  if (["readText", "togglePause", "stopPlayback"].includes(message.type) && message.target === "offscreen") {
-    await setupOffscreenDocument('offScreen/off-screen.html');
+  // Handle messages targeted to the offscreen document
+  if (message.target === "offscreen" && message.type) {
+    ensureOffscreenAndProcess(message);
+    return;
   }
 
-  if (message.action === "offscreen:readPage") {
-    grabAndReadPage();
-  } else if (message.action === "offscreen:togglePause") {
-    chrome.runtime.sendMessage({
-      type: "togglePause",
-      target: "offscreen",
-      isPaused: message.isPaused,
-    });
-  } else if (message.action === "offscreen:stopPlayback") {
-    console.log("[Background] Stopping playback and removing control panel.");
-    chrome.runtime.sendMessage({
-      type: "stopPlayback",
-      target: "offscreen",
-    });
-  } else {
-    // 🔹 Relay messages to the content script (UI updates)
+  // Handle UI update messages (controlPanel:*)
+  if (message.action && message.action.startsWith("controlPanel:")) {
+    // Relay messages to the content script (UI updates)
     chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
       if (!tabs || tabs.length === 0 || !tabs[0].id) {
         console.error("[Background] No active tab found.");

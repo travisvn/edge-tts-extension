@@ -23,8 +23,8 @@ function Popup() {
   const [selectedVoice, setSelectedVoice] = useState<string>('en-US-ChristopherNeural');
   const [customVoice, setCustomVoice] = useState<string>('');
   const [speed, setSpeed] = useState<number>(1.2);
-
   const [darkMode, setDarkMode] = useState<boolean>(false);
+  const [isProcessing, setIsProcessing] = useState<boolean>(false);
 
   useEffect(() => {
     // Load saved settings
@@ -35,16 +35,12 @@ function Popup() {
       if (result.speed) {
         setSpeed(result.speed);
       }
-
       if (result.customVoice) {
         setCustomVoice(result.customVoice);
       }
-
       if (result.darkMode) {
         setDarkMode(result.darkMode || false);
         document.documentElement.classList.toggle('dark', result.darkMode || false);
-
-        // setDarkMode(result.darkMode)
       }
     });
   }, []);
@@ -71,45 +67,54 @@ function Popup() {
     chrome.storage.sync.set({ darkMode: newDarkMode });
   };
 
-  const handlePlayClick2 = () => {
-    chrome.tabs.query({ active: true, currentWindow: true }, (tabs: chrome.tabs.Tab[]) => {
+  const handleReadPageAloud = async () => {
+    if (isProcessing) return;
+
+    setIsProcessing(true);
+
+    // Get current settings
+    const settings = {
+      voiceName: selectedVoice,
+      customVoice: customVoice,
+      speed: speed
+    };
+
+    // Redundant
+    chrome.tabs.query({ active: true, currentWindow: true }, async (tabs: chrome.tabs.Tab[]) => {
       const tab = tabs[0];
       if (tab && tab.id) {
-        chrome.scripting.executeScript(
-          {
+        try {
+          const results = await chrome.scripting.executeScript({
             target: { tabId: tab.id },
-            func: () => {
-              return document.body.innerText;
-            },
-          },
-          (injectionResults) => {
-            if (chrome.runtime.lastError) {
-              console.error(chrome.runtime.lastError);
-              return;
-            }
-            for (const frameResult of injectionResults) {
-              const pageContent = frameResult.result as string;
-              if (pageContent && pageContent.trim() !== '') {
-                // handlePlay(pageContent);
-                chrome.tabs.sendMessage(tab.id, {
-                  action: "readText",
-                  text: pageContent,
-                });
-              } else {
-                console.warn('The page content is empty.');
-              }
+            func: () => document.body.innerText,
+          });
+
+          if (results && results.length > 0 && results[0].result) {
+            const pageContent = results[0].result as string;
+            if (pageContent && pageContent.trim() !== '') {
+              // Use message format that ensures offscreen document is ready
+              chrome.runtime.sendMessage({
+                type: "readText",
+                target: "offscreen",
+                data: pageContent,
+                settings
+              });
+
+              // Close popup after sending the command
+              setTimeout(() => window.close(), 100);
+            } else {
+              console.warn('The page content is empty.');
+              setIsProcessing(false);
             }
           }
-        );
+        } catch (error) {
+          console.error('Error reading page content:', error);
+          setIsProcessing(false);
+        }
       } else {
         console.error('No active tab found');
+        setIsProcessing(false);
       }
-    });
-  };
-
-  const handlePlayClick = async () => {
-    chrome.runtime.sendMessage({
-      action: 'offscreen:readPage',
     });
   };
 
@@ -124,12 +129,10 @@ function Popup() {
       <h1 className="text-xl font-bold select-none">Edge TTS Extension</h1>
 
       <div className="mt-4">
-
         <label className="block">Select Voice:</label>
         <select
           className="w-full mt-1 p-2 border rounded dark:bg-slate-700 dark:border-slate-500 outline-none ring-0"
           value={selectedVoice}
-          // onChange={(e) => setSelectedVoice(e.target.value)}
           onChange={(e) => handleVoiceChange(e.target.value)}
         >
           {voices.map((voice) => (
@@ -165,25 +168,23 @@ function Popup() {
           max="2.0"
           step="0.1"
           value={speed}
-          // onChange={(e) => setSpeed(parseFloat(e.target.value))}
           onChange={(e) => handleSpeedChange(parseFloat(e.target.value))}
           className="w-full"
         />
       </div>
       <div className="mt-4">
-        <>
-          <button
-            onClick={() => handlePlayClick()}
-            className="px-4 py-2 bg-blue-500 text-white rounded"
-          >
-            Read current page aloud
-          </button>
-        </>
+        <button
+          onClick={handleReadPageAloud}
+          className={`px-4 py-2 bg-blue-500 text-white rounded ${isProcessing ? 'opacity-50 cursor-not-allowed' : ''}`}
+          disabled={isProcessing}
+        >
+          {isProcessing ? 'Processing...' : 'Read current page aloud'}
+        </button>
       </div>
     </div>
   );
 }
 
 const container = document.getElementById('root');
-const root = createRoot(container!); // createRoot(container!) if you use TypeScript
+const root = createRoot(container!);
 root.render(<Popup />);

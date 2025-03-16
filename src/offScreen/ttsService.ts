@@ -11,15 +11,27 @@ function cleanup() {
   }
   audioElement = null;
   isPlaying = false;
-  chrome.runtime.sendMessage({ action: "controlPanel:remove" });
-}
 
+  // Notify content script to remove the control panel using consistent message format
+  chrome.runtime.sendMessage({
+    action: "controlPanel:remove"
+  });
+
+  // Clear media session handlers
+  if ('mediaSession' in navigator) {
+    navigator.mediaSession.setActionHandler("play", null);
+    navigator.mediaSession.setActionHandler("pause", null);
+    navigator.mediaSession.setActionHandler("stop", null);
+  }
+}
 
 export function togglePause() {
   if (!audioElement) return;
 
   if (audioElement.paused) {
-    audioElement.play();
+    audioElement.play().catch(err => {
+      console.error("Error playing audio:", err);
+    });
   } else {
     audioElement.pause();
   }
@@ -45,16 +57,17 @@ export async function readText(text: string, settings: ReadTextSettings = {
   speed: 1.2,
 }) {
   cleanup();
-  chrome.runtime.sendMessage({ action: "controlPanel:create" });
+
+  // Send message to create the control panel first using consistent message format
+  chrome.runtime.sendMessage({
+    action: "controlPanel:create"
+  });
 
   try {
-    // const settings = await chrome.storage.sync.get();
-
     const tts = new EdgeTTSClient();
     await tts.setMetadata(
       settings.customVoice || settings.voiceName, // Use custom voice if specified
       OUTPUT_FORMAT.WEBM_24KHZ_16BIT_MONO_OPUS
-      // OUTPUT_FORMAT.AUDIO_24KHZ_48KBITRATE_MONO_MP3
     );
 
     const prosodyOptions = new ProsodyOptions();
@@ -69,38 +82,73 @@ export async function readText(text: string, settings: ReadTextSettings = {
       if (!audioElement) {
         audioElement = new Audio();
         audioElement.src = URL.createObjectURL(mediaSource);
-        navigator.mediaSession.setActionHandler("play", () =>
-          audioElement.play()
-        );
-        navigator.mediaSession.setActionHandler("pause", () =>
-          audioElement.pause()
-        );
-        navigator.mediaSession.setActionHandler("stop", () => stopPlayback());
+
+        // Set up media session handlers
+        if ('mediaSession' in navigator) {
+          navigator.mediaSession.metadata = new MediaMetadata({
+            title: 'Reading Text',
+            artist: 'Edge TTS Extension',
+            album: 'Text to Speech'
+          });
+
+          navigator.mediaSession.setActionHandler("play", () => {
+            if (!audioElement.paused) return; // Already playing
+            audioElement.play().catch(err => {
+              console.error("Error playing audio:", err);
+            });
+          });
+
+          navigator.mediaSession.setActionHandler("pause", () => {
+            if (audioElement.paused) return; // Already paused
+            audioElement.pause();
+          });
+
+          navigator.mediaSession.setActionHandler("stop", () => {
+            stopPlayback();
+          });
+        }
 
         audioElement.onplay = () => {
           isPlaying = true;
-          navigator.mediaSession.playbackState = "playing";
+          if ('mediaSession' in navigator) {
+            navigator.mediaSession.playbackState = "playing";
+          }
 
-          // 🔹 Notify the control panel that playback has started
-          chrome.runtime.sendMessage({ action: "controlPanel:updatePlaybackState", isPlaying: true });
+          // Notify the control panel that playback has started using consistent message format
+          chrome.runtime.sendMessage({
+            action: "controlPanel:updatePlaybackState",
+            isPlaying: true
+          });
         };
 
         audioElement.onpause = () => {
           isPlaying = false;
-          navigator.mediaSession.playbackState = "paused";
+          if ('mediaSession' in navigator) {
+            navigator.mediaSession.playbackState = "paused";
+          }
 
-          // 🔹 Notify the control panel that playback has paused
-          chrome.runtime.sendMessage({ action: "controlPanel:updatePlaybackState", isPlaying: false });
+          // Notify the control panel that playback has paused using consistent message format
+          chrome.runtime.sendMessage({
+            action: "controlPanel:updatePlaybackState",
+            isPlaying: false
+          });
         };
 
         audioElement.onended = () => {
           isPlaying = false;
-          navigator.mediaSession.playbackState = "paused";
+          if ('mediaSession' in navigator) {
+            navigator.mediaSession.playbackState = "none";
+          }
 
-          // 🔹 Notify the control panel that playback has ended
-          chrome.runtime.sendMessage({ action: "controlPanel:updatePlaybackState", isPlaying: false });
+          // Notify the control panel that playback has ended using consistent message format
+          chrome.runtime.sendMessage({
+            action: "controlPanel:updatePlaybackState",
+            isPlaying: false
+          });
+
+          // Clean up resources when playback is complete
+          cleanup();
         };
-
       }
 
       const appendNextChunk = () => {
@@ -124,9 +172,12 @@ export async function readText(text: string, settings: ReadTextSettings = {
         }
       };
 
-
       mediaSource.addEventListener("sourceopen", () => {
-        chrome.runtime.sendMessage({ action: "controlPanel:updateLoading", isLoading: false });
+        // Update UI to indicate loading is complete using consistent message format
+        chrome.runtime.sendMessage({
+          action: "controlPanel:updateLoading",
+          isLoading: false
+        });
         try {
           sourceBuffer = mediaSource.addSourceBuffer(
             'audio/webm; codecs="opus"'
@@ -155,10 +206,6 @@ export async function readText(text: string, settings: ReadTextSettings = {
             };
             checkAndEndStream();
           });
-
-          // stream.on("error", (err) => {
-          //   reject(err);
-          // });
         } catch (error) {
           reject(error);
         }
