@@ -183,7 +183,7 @@ Contributions are welcome! To get started:
 
 ## Feature Requests
 
-For feature requests, please use the **[Discussions](https://github.com/travisvn/edge-tts-extension/discussions)** section or share your ideas on our **[Discord](https://discord.gg/GkFbBCBqJ6)**. This helps us keep Issues focused on bugs and actionable tasks. Thanks for your input!
+For feature requests, please use the **[Discussions](https://github.com/travisvn/edge-tts-extension/discussions)** section or share your ideas on our **[Discord](https://tts.travisvn.com/discord)**. This helps us keep Issues focused on bugs and actionable tasks. Thanks for your input!
 
 ---
 
