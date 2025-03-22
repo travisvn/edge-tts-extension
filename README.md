@@ -1,12 +1,12 @@
 # 🎙️ Edge TTS Reader: Free, High-Quality Text-to-Speech Extension
 
-![GitHub stars](https://img.shields.io/github/stars/travisvn/edge-tts-chrome-extension?style=social)
-![GitHub forks](https://img.shields.io/github/forks/travisvn/edge-tts-chrome-extension?style=social)
-![GitHub repo size](https://img.shields.io/github/repo-size/travisvn/edge-tts-chrome-extension)
-![GitHub language count](https://img.shields.io/github/languages/count/travisvn/edge-tts-chrome-extension)
-![GitHub top language](https://img.shields.io/github/languages/top/travisvn/edge-tts-chrome-extension)
-![GitHub last commit](https://img.shields.io/github/last-commit/travisvn/edge-tts-chrome-extension?color=red)
-![Hits](https://hits.seeyoufarm.com/api/count/incr/badge.svg?url=https%3A%2F%2Fgithub.com%2Ftravisvn%2Fedge-tts-chrome-extension&count_bg=%2379C83D&title_bg=%23555555&icon=&icon_color=%23E7E7E7&title=hits&edge_flat=false)
+![GitHub stars](https://img.shields.io/github/stars/travisvn/edge-tts-extension?style=social)
+![GitHub forks](https://img.shields.io/github/forks/travisvn/edge-tts-extension?style=social)
+![GitHub repo size](https://img.shields.io/github/repo-size/travisvn/edge-tts-extension)
+![GitHub language count](https://img.shields.io/github/languages/count/travisvn/edge-tts-extension)
+![GitHub top language](https://img.shields.io/github/languages/top/travisvn/edge-tts-extension)
+![GitHub last commit](https://img.shields.io/github/last-commit/travisvn/edge-tts-extension?color=red)
+![Hits](https://hits.seeyoufarm.com/api/count/incr/badge.svg?url=https%3A%2F%2Fgithub.com%2Ftravisvn%2Fedge-tts-extension&count_bg=%2379C83D&title_bg=%23555555&icon=&icon_color=%23E7E7E7&title=hits&edge_flat=false)
 [![Discord](https://img.shields.io/badge/Discord-Voice_AI_%26_TTS_Tools-blue?logo=discord&logoColor=white)](https://discord.gg/GkFbBCBqJ6)
 
 Edge TTS Reader brings your browsing experience to life by turning text into natural-sounding audio. Powered by Microsoft Edge's advanced Read Aloud API, this extension makes it effortless to listen to selected text or entire web pages. Whether you're multitasking, improving productivity, or just prefer listening over reading, Edge TTS Reader is your perfect companion.
@@ -92,11 +92,11 @@ Your data stays secure. Text is processed locally or through Microsoft's trusted
 
 1. Clone this repository:
    ```bash
-   git clone https://github.com/travisvn/edge-tts-chrome-extension.git
+   git clone https://github.com/travisvn/edge-tts-extension.git
    ```
 2. Navigate to the directory:
    ```bash
-   cd edge-tts-chrome-extension
+   cd edge-tts-extension
    ```
 3. Install dependencies:
    ```bash
@@ -115,11 +115,11 @@ Your data stays secure. Text is processed locally or through Microsoft's trusted
 
 1. Clone this repository:
    ```bash
-   git clone https://github.com/travisvn/edge-tts-chrome-extension.git
+   git clone https://github.com/travisvn/edge-tts-extension.git
    ```
 2. Navigate to the directory:
    ```bash
-   cd edge-tts-chrome-extension
+   cd edge-tts-extension
    ```
 3. Install dependencies:
    ```bash
@@ -183,7 +183,7 @@ Contributions are welcome! To get started:
 
 ## Feature Requests
 
-For feature requests, please use the **[Discussions](https://github.com/travisvn/edge-tts-chrome-extension/discussions)** section or share your ideas on our **[Discord](https://discord.gg/GkFbBCBqJ6)**. This helps us keep Issues focused on bugs and actionable tasks. Thanks for your input!
+For feature requests, please use the **[Discussions](https://github.com/travisvn/edge-tts-extension/discussions)** section or share your ideas on our **[Discord](https://discord.gg/GkFbBCBqJ6)**. This helps us keep Issues focused on bugs and actionable tasks. Thanks for your input!
 
 ---
 
