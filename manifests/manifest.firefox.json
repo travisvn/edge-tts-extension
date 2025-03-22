@@ -1,37 +1,33 @@
 {
   "manifest_version": 3,
   "name": "Edge Text to Speech Voice Reader",
-  "version": "1.0.2",
+  "version": "1.0.3",
   "description": "Text-to-speech service leveraging the Read Aloud API from Microsoft Edge.",
   "author": "Travis",
+  "browser_specific_settings": {
+    "gecko": {
+      "id": "edge-tts-extension@travis2.com"
+    }
+  },
   "homepage_url": "https://github.com/travisvn/edge-tts-chrome-extension",
-  "minimum_chrome_version": "88",
   "offline_enabled": true,
-  "incognito": "split",
+  "incognito": "spanning",
   "action": {
     "default_popup": "popup/index.html"
   },
   "background": {
-    "service_worker": "background/bundle.js"
+    "service_worker": "background/bundle.js",
+    "scripts": ["background/bundle.js"]
   },
   "host_permissions": [
     "https://speech.platform.bing.com/*",
     "wss://speech.platform.bing.com/*"
   ],
-  "permissions": [
-    "contextMenus",
-    "activeTab",
-    "scripting",
-    "storage"
-  ],
+  "permissions": ["contextMenus", "activeTab", "scripting", "storage"],
   "content_scripts": [
     {
-      "matches": [
-        "<all_urls>"
-      ],
-      "js": [
-        "contentScript/bundle.js"
-      ]
+      "matches": ["<all_urls>"],
+      "js": ["contentScript/bundle.js"]
     }
   ],
   "icons": {

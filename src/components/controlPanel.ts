@@ -1,7 +1,8 @@
+import browser from 'webextension-polyfill';
 import { circlePause, circleStop } from '../lib/svgs';
 
 export async function createControlPanel(isLoading = true) {
-	const settings = await chrome.storage.sync.get({
+	const settings = await browser.storage.sync.get({
 		darkMode: false,
 	});
 

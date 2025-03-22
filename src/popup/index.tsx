@@ -1,8 +1,10 @@
 // src/popup/index.tsx
 import React, { useState, useEffect } from 'react';
 import { createRoot } from 'react-dom/client';
+import browser from 'webextension-polyfill';
 import './styles.css';
 import { MoonIcon, SunIcon } from 'lucide-react';
+import { isFirefox } from '../utils/browserDetection';
 
 // Top voices to be displayed in the dropdown
 const TOP_VOICES = [
@@ -23,88 +25,90 @@ function Popup() {
   const [selectedVoice, setSelectedVoice] = useState<string>('en-US-ChristopherNeural');
   const [customVoice, setCustomVoice] = useState<string>('');
   const [speed, setSpeed] = useState<number>(1.2);
-
   const [darkMode, setDarkMode] = useState<boolean>(false);
 
   useEffect(() => {
     // Load saved settings
-    chrome.storage.sync.get(['voiceName', 'speed', 'customVoice', 'darkMode'], (result) => {
+    browser.storage.sync.get(['voiceName', 'speed', 'customVoice', 'darkMode']).then((result) => {
       if (result.voiceName) {
-        setSelectedVoice(result.voiceName);
+        setSelectedVoice(result.voiceName as string);
       }
       if (result.speed) {
-        setSpeed(result.speed);
+        setSpeed(result.speed as number);
       }
-
       if (result.customVoice) {
-        setCustomVoice(result.customVoice);
+        setCustomVoice(result.customVoice as string);
       }
-
-      if (result.darkMode) {
-        setDarkMode(result.darkMode || false);
-        document.documentElement.classList.toggle('dark', result.darkMode || false);
-
-        // setDarkMode(result.darkMode)
+      if (result.darkMode !== undefined) {
+        setDarkMode(result.darkMode as boolean);
+        document.documentElement.classList.toggle('dark', result.darkMode as boolean);
       }
     });
   }, []);
 
   const handleVoiceChange = (voice) => {
     setSelectedVoice(voice);
-    chrome.storage.sync.set({ voiceName: voice });
+    browser.storage.sync.set({ voiceName: voice });
   };
 
   const handleCustomVoiceChange = (customVoice) => {
     setCustomVoice(customVoice);
-    chrome.storage.sync.set({ customVoice: customVoice });
+    browser.storage.sync.set({ customVoice: customVoice });
   };
 
   const handleSpeedChange = (newSpeed) => {
     setSpeed(newSpeed);
-    chrome.storage.sync.set({ speed: newSpeed });
+    browser.storage.sync.set({ speed: newSpeed });
   };
 
   const handleDarkModeToggle = () => {
     const newDarkMode = !darkMode;
     setDarkMode(newDarkMode);
     document.documentElement.classList.toggle('dark', newDarkMode);
-    chrome.storage.sync.set({ darkMode: newDarkMode });
+    browser.storage.sync.set({ darkMode: newDarkMode });
   };
 
-  const handlePlayClick = () => {
-    chrome.tabs.query({ active: true, currentWindow: true }, (tabs: chrome.tabs.Tab[]) => {
+  const handlePlayClick = async () => {
+    try {
+      const tabs = await browser.tabs.query({ active: true, currentWindow: true });
       const tab = tabs[0];
-      if (tab && tab.id) {
-        chrome.scripting.executeScript(
-          {
-            target: { tabId: tab.id },
-            func: () => {
-              return document.body.innerText;
-            },
-          },
-          (injectionResults) => {
-            if (chrome.runtime.lastError) {
-              console.error(chrome.runtime.lastError);
-              return;
-            }
-            for (const frameResult of injectionResults) {
-              const pageContent = frameResult.result as string;
-              if (pageContent && pageContent.trim() !== '') {
-                // handlePlay(pageContent);
-                chrome.tabs.sendMessage(tab.id, {
-                  action: "readText",
-                  text: pageContent,
-                });
-              } else {
-                console.warn('The page content is empty.');
-              }
-            }
-          }
-        );
-      } else {
+      if (!tab?.id) {
         console.error('No active tab found');
+        return;
       }
-    });
+
+      const injectionResults = await browser.scripting.executeScript({
+        target: { tabId: tab.id },
+        func: () => document.body.innerText,
+      });
+
+      for (const frameResult of injectionResults) {
+        const pageContent = frameResult.result as string;
+        if (!pageContent || !pageContent.trim()) {
+          console.warn('The page content is empty.');
+          continue;
+        }
+
+        if (isFirefox()) {
+          // 🔁 Firefox workaround: inject postMessage in page context
+          await browser.scripting.executeScript({
+            target: { tabId: tab.id },
+            func: (text) => {
+              window.postMessage({ action: 'triggerTTS', text }, '*');
+            },
+            args: [pageContent],
+          });
+        } else {
+          // ✅ Chrome path: send message to content script
+          await browser.tabs.sendMessage(tab.id, {
+            action: 'readText',
+            text: pageContent,
+          });
+        }
+      }
+    } catch (error) {
+      console.error('Error sending TTS message:', error);
+    }
   };
 
   return (

@@ -1,10 +1,12 @@
-import { EdgeTTSClient, ProsodyOptions, OUTPUT_FORMAT } from "edge-tts-client";
+import browser from 'webextension-polyfill';
+import { EdgeTTSClient, ProsodyOptions, OUTPUT_FORMAT } from './lib/EdgeTTSClient';
 import './content-styles.css';
 import {
   createControlPanel,
   updatePanelContent,
 } from "./components/controlPanel";
 import { circlePause, circlePlay } from './lib/svgs';
+import { isFirefox } from './utils/browserDetection';
 
 let audioElement = null;
 let isPlaying = false;
@@ -17,7 +19,7 @@ window.stopPlayback = stopPlayback;
 export async function initTTS(text) {
   cleanup();
   try {
-    const settings = await chrome.storage.sync.get({
+    const settings = await browser.storage.sync.get({
       voiceName: "en-US-ChristopherNeural",
       customVoice: "",
       speed: 1.2,
@@ -27,14 +29,15 @@ export async function initTTS(text) {
     controlPanel = await createControlPanel(true);
 
     const tts = new EdgeTTSClient();
+    const voiceName = settings.customVoice as string || settings.voiceName as string;
     await tts.setMetadata(
-      settings.customVoice || settings.voiceName, // Use custom voice if specified
+      voiceName, // Use custom voice if specified
       OUTPUT_FORMAT.WEBM_24KHZ_16BIT_MONO_OPUS
       // OUTPUT_FORMAT.AUDIO_24KHZ_48KBITRATE_MONO_MP3
     );
 
     const prosodyOptions = new ProsodyOptions();
-    prosodyOptions.rate = settings.speed;
+    prosodyOptions.rate = settings.speed as number;
 
     return new Promise((resolve, reject) => {
       const mediaSource = new MediaSource();
@@ -44,12 +47,15 @@ export async function initTTS(text) {
 
       if (!audioElement) {
         audioElement = new Audio();
+        audioElement.muted = true; // 🔧 allow autoplay in Firefox
         audioElement.src = URL.createObjectURL(mediaSource);
+
         navigator.mediaSession.setActionHandler("play", () => audioElement.play());
         navigator.mediaSession.setActionHandler("pause", () => audioElement.pause());
         navigator.mediaSession.setActionHandler("stop", () => stopPlayback());
 
         audioElement.onplay = () => {
+          audioElement.muted = false; // 🔊 unmute once playback begins
           isPlaying = true;
           updatePlayPauseButton();
         };
@@ -75,18 +81,34 @@ export async function initTTS(text) {
           try {
             const chunk = chunks.shift();
             if (chunk) {
-              sourceBuffer.appendBuffer(chunk);
+              // SAFELY COPY to avoid DOMException from detached buffer
+              const safeChunk = new Uint8Array(chunk.length);
+              safeChunk.set(chunk);
+              sourceBuffer.appendBuffer(safeChunk);
+
               if (isFirstChunk) {
-                audioElement.play().catch(console.error);
+                if (isFirefox()) {
+                  setTimeout(() => {
+                    audioElement.play().catch((err) => {
+                      console.warn('Firefox autoplay workaround failed:', err);
+                    });
+                  }, 0);
+                } else {
+                  audioElement.play().catch((err) => {
+                    console.warn('Audio playback failed:', err);
+                  });
+                }
                 isFirstChunk = false;
               }
             }
-          } catch (e) {
-            if (e.name === 'QuotaExceededError') {
-              setTimeout(appendNextChunk, 1000);
-            } else {
-              reject(e);
-            }
+          } catch (err) {
+            console.error('appendNextChunk error:', err, 'chunk length:', chunks[0]?.length);
+
+            // 🚨 Drop the bad chunk so we don't infinitely loop
+            chunks.shift();
+
+            // Try the next chunk in the next tick
+            setTimeout(appendNextChunk, 100);
           }
         }
       };
@@ -100,7 +122,10 @@ export async function initTTS(text) {
 
           stream.on("data", (data) => {
             if (data instanceof Uint8Array) {
-              chunks.push(data);
+              // Firefox fix: clone data before using it
+              const cloned = new Uint8Array(data.byteLength);
+              cloned.set(data);
+              chunks.push(cloned);
               appendNextChunk();
             }
           });
@@ -185,20 +210,27 @@ function removeControlPanel() {
   controlPanel = null;
 }
 
-// Message listener
-chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
+// Define the message structure
+interface ExtensionMessage {
+  action: string;
+  text?: string;
+}
+
+// Message listener with type assertion to bypass strict type checking
+browser.runtime.onMessage.addListener(function handleMessage(
+  request: ExtensionMessage,
+  sender,
+  sendResponse
+) {
   if (request.action === "stopPlayback") {
     stopPlayback();
-    return;
   }
-
-  if (request.action === "readText") {
+  else if (request.action === "readText") {
     initTTS(request.text).catch((error) => {
       console.error("TTS initialization error:", error);
     });
   }
-
-  if (request.action === 'readPage') {
+  else if (request.action === 'readPage') {
     // Extract the page content
     const pageContent = document.body.innerText;
 
@@ -209,5 +241,16 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     } else {
       console.warn('The page content is empty.');
     }
+  }
+
+  return true; // Always return true for polyfill compatibility
+} as browser.Runtime.OnMessageListener);
+
+window.addEventListener('message', (event) => {
+  if (event.source !== window) return;
+
+  const { action, text } = event.data || {};
+  if (action === 'triggerTTS' && typeof text === 'string') {
+    initTTS(text).catch((err) => console.error('initTTS error:', err));
   }
 });
