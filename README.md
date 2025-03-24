@@ -84,7 +84,7 @@ Your data stays secure. Text is processed locally or through Microsoft's trusted
 ### Option 1: From Stores
 
 - Chrome: [Chrome Web Store](https://chromewebstore.google.com/detail/edge-text-to-speech-voice/jeenjljjokaobgdbemlplaidbjfliknl)
-- Firefox: [Firefox Add-ons](https://addons.mozilla.org/en-US/firefox) _(coming soon)_
+- Firefox: [Firefox Add-ons](https://addons.mozilla.org/en-US/firefox/addon/edge-tts/) 🆕🔥
 
 ### Option 2: Manual Installation
 
