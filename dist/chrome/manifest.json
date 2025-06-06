@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Edge Text to Speech Voice Reader",
-  "version": "1.0.3",
+  "version": "1.0.4",
   "description": "Text-to-speech service leveraging the Read Aloud API from Microsoft Edge.",
   "author": "Travis",
   "homepage_url": "https://github.com/travisvn/edge-tts-chrome-extension",

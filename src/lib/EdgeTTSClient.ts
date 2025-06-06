@@ -248,11 +248,22 @@ export class EdgeTTSClient {
     return this.sendSSMLRequest(this.buildSSML(text, options));
   }
 
+  private escapeSSML(text: string): string {
+    return text
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&apos;');
+  }
+
   private buildSSML(text: string, options: ProsodyOptions): string {
+    const sanitizedText = this.escapeSSML(text);
+
     return `<speak version="1.0" xmlns="http://www.w3.org/2001/10/synthesis" xmlns:mstts="https://www.w3.org/2001/mstts" xml:lang="${this.voiceLocale}">
       <voice name="${this.voice}">
         <prosody pitch="${options.pitch}" rate="${options.rate}" volume="${options.volume}">
-          ${text}
+          ${sanitizedText}
         </prosody>
       </voice>
     </speak>`;
