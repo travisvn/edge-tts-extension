@@ -1,4 +1,5 @@
 import { Buffer } from 'buffer';
+import { DRM } from './drm';
 
 if (typeof globalThis.Buffer === 'undefined') {
   globalThis.Buffer = Buffer;
@@ -92,6 +93,7 @@ export class EdgeTTSClient {
   private static SYNTH_URL = `wss://speech.platform.bing.com/consumer/speech/synthesize/readaloud/edge/v1?TrustedClientToken=${EdgeTTSClient.CLIENT_TOKEN}`;
   private static BINARY_DELIM = "Path:audio\r\n";
   private static VOICE_LANG_REGEX = /\w{2}-\w{2}/;
+  private static SEC_MS_GEC_VERSION = "1-130.0.2849.68";
 
   private enableLogging: boolean;
   private isBrowser: boolean;
@@ -120,8 +122,32 @@ export class EdgeTTSClient {
     this.ws?.send(message);
   }
 
-  private initWebSocket() {
-    this.ws = new WebSocket(EdgeTTSClient.SYNTH_URL);
+  private async initWebSocket() {
+    // Generate Sec-MS-GEC token for authentication
+    const secMsGec = await DRM.generateSecMsGec();
+
+    // Create WebSocket with custom headers
+    const headers = {
+      'Sec-MS-GEC': secMsGec,
+      'Sec-MS-GEC-Version': EdgeTTSClient.SEC_MS_GEC_VERSION,
+      'Origin': 'chrome-extension://jdiccldimpdaibmpdkjnbmckianbfold',
+      'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Safari/537.36 Edg/130.0.0.0'
+    };
+
+    // Note: Browser WebSocket API doesn't support custom headers directly
+    // For browser environments, we'll use the URL as-is
+    // For Node.js environments, we can use ws library with headers
+    if (this.isBrowser) {
+      // In browser, we can't set custom headers on WebSocket
+      // The token needs to be added to the URL or handled differently
+      const urlWithToken = `${EdgeTTSClient.SYNTH_URL}&Sec-MS-GEC=${secMsGec}&Sec-MS-GEC-Version=${encodeURIComponent(EdgeTTSClient.SEC_MS_GEC_VERSION)}`;
+      this.ws = new WebSocket(urlWithToken);
+    } else {
+      // For Node.js environment, assuming ws library is available
+      this.ws = new WebSocket(EdgeTTSClient.SYNTH_URL, {
+        headers
+      } as any);
+    }
     this.ws.binaryType = "arraybuffer";
     let metadataBuffer: Metadata = [];
 
@@ -214,8 +240,17 @@ export class EdgeTTSClient {
     }`;
   }
 
-  getVoices(): Promise<Voice[]> {
-    return fetch(EdgeTTSClient.VOICES_URL)
+  async getVoices(): Promise<Voice[]> {
+    // Generate Sec-MS-GEC token for authentication
+    const secMsGec = await DRM.generateSecMsGec();
+
+    return fetch(EdgeTTSClient.VOICES_URL, {
+      headers: {
+        'Sec-MS-GEC': secMsGec,
+        'Sec-MS-GEC-Version': EdgeTTSClient.SEC_MS_GEC_VERSION,
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Safari/537.36 Edg/130.0.0.0'
+      }
+    })
       .then((response) => response.json())
       .catch((error) => Promise.reject(error));
   }
