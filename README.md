@@ -1,7 +1,3 @@
-> [!IMPORTANT]
-> The Bing Speech API endpoint is **currently down** (as of August 17, 2025)  
-> _Currently tracking the issue here https://github.com/rany2/edge-tts/issues/401_
-
 # 🎙️ Edge TTS Reader: Free, High-Quality Text-to-Speech Extension
 
 ![GitHub stars](https://img.shields.io/github/stars/travisvn/edge-tts-extension?style=social)
