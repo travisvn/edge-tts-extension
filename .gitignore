@@ -7,3 +7,19 @@ gptree_output.txt
 
 web-ext-artifacts
 *.zip
+
+# dot-folders
+.*/
+
+# dot-files
+.*
+
+# markdown files
+*.md
+
+# include these
+!README.md
+!LICENSE
+
+!.gitignore
+!.bablerc
