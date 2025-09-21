@@ -266,6 +266,9 @@ browser.runtime.onMessage.addListener(function handleMessage(
   if (request.action === "stopPlayback") {
     stopPlayback();
   }
+  else if (request.action === "togglePlayback") {
+    togglePause();
+  }
   else if (request.action === "readText") {
     initTTS(request.text!).catch((error) => {
       console.error("TTS initialization error:", error);

@@ -19,6 +19,36 @@
     "wss://speech.platform.bing.com/*"
   ],
   "permissions": ["contextMenus", "activeTab", "scripting", "storage"],
+  "commands": {
+    "read-selection": {
+      "suggested_key": {
+        "default": "Ctrl+Shift+S",
+        "mac": "Command+Shift+S"
+      },
+      "description": "Read selected text aloud"
+    },
+    "read-page": {
+      "suggested_key": {
+        "default": "Ctrl+Shift+P",
+        "mac": "Command+Shift+P"
+      },
+      "description": "Read entire page aloud"
+    },
+    "read-from-here": {
+      "suggested_key": {
+        "default": "Ctrl+Shift+H",
+        "mac": "Command+Shift+H"
+      },
+      "description": "Read from selected position to end of page"
+    },
+    "toggle-playback": {
+      "suggested_key": {
+        "default": "Ctrl+Shift+Space",
+        "mac": "Command+Shift+Space"
+      },
+      "description": "Toggle play/pause audio playback"
+    }
+  },
   "content_scripts": [
     {
       "matches": ["<all_urls>"],
