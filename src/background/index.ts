@@ -15,6 +15,13 @@ browser.runtime.onInstalled.addListener(() => {
     title: 'Read Page Aloud with Edge TTS',
     contexts: ['page'],
   });
+
+  // Add context menu for reading from here (when text is selected)
+  browser.contextMenus.create({
+    id: 'readFromHere',
+    title: 'Start reading aloud from here',
+    contexts: ['selection'],
+  });
 });
 
 browser.contextMenus.onClicked.addListener((info, tab) => {
@@ -28,6 +35,12 @@ browser.contextMenus.onClicked.addListener((info, tab) => {
     // Handle reading the entire page
     browser.tabs.sendMessage(tab.id, {
       action: 'readPage',
+    });
+  } else if (info.menuItemId === 'readFromHere' && info.selectionText && tab?.id !== undefined) {
+    // Handle reading from here
+    browser.tabs.sendMessage(tab.id, {
+      action: 'readFromHere',
+      text: info.selectionText,
     });
   }
 });

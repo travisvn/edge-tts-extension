@@ -7,6 +7,7 @@ import {
 } from "./components/controlPanel";
 import { circlePause, circlePlay } from './lib/svgs';
 import { isFirefox } from './utils/browserDetection';
+import { extractTextFromSelection, extractTextFromSelectionSimple } from './utils/textExtraction';
 
 let audioElement: HTMLAudioElement | null = null;
 let isPlaying = false;
@@ -280,6 +281,35 @@ browser.runtime.onMessage.addListener(function handleMessage(
       });
     } else {
       console.warn('The page content is empty.');
+    }
+  }
+  else if (request.action === 'readFromHere' && request.text) {
+    // Extract text from the current selection point to the end of the page
+    try {
+      let textToRead = extractTextFromSelection(request.text);
+
+      // Fallback to simple extraction if the advanced method fails
+      if (!textToRead || textToRead.trim().length === 0) {
+        textToRead = extractTextFromSelectionSimple(request.text);
+      }
+
+      if (textToRead && textToRead.trim() !== '') {
+        initTTS(textToRead).catch((error) => {
+          console.error("TTS initialization error:", error);
+        });
+      } else {
+        console.warn('No text found from selection point.');
+        // Fallback to reading the selected text only
+        initTTS(request.text).catch((error) => {
+          console.error("TTS initialization error:", error);
+        });
+      }
+    } catch (error) {
+      console.error("Error extracting text from selection:", error);
+      // Fallback to reading the selected text only
+      initTTS(request.text).catch((error) => {
+        console.error("TTS initialization error:", error);
+      });
     }
   }
 
