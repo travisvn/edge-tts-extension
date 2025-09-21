@@ -12,12 +12,18 @@ import { extractTextFromSelection, extractTextFromSelectionSimple } from './util
 let audioElement: HTMLAudioElement | null = null;
 let isPlaying = false;
 let controlPanel: HTMLElement | null = null;
+let currentTTSDeactivate: (() => void) | null = null;
 
 // Make these functions available to the control panel
 (window as any).togglePause = togglePause;
 (window as any).stopPlayback = stopPlayback;
 
 export async function initTTS(text: string): Promise<void> {
+  // Deactivate any previous TTS instance
+  if (currentTTSDeactivate) {
+    currentTTSDeactivate();
+  }
+
   cleanup();
   try {
     const settings = await browser.storage.sync.get({
@@ -45,6 +51,12 @@ export async function initTTS(text: string): Promise<void> {
       let sourceBuffer: SourceBuffer;
       const chunks: Uint8Array[] = [];
       let isFirstChunk = true;
+      let isActive = true; // Track if this TTS instance is still active
+
+      // Set up the deactivation function for this instance
+      currentTTSDeactivate = () => {
+        isActive = false;
+      };
 
       if (!audioElement) {
         audioElement = new Audio();
@@ -87,6 +99,11 @@ export async function initTTS(text: string): Promise<void> {
       }
 
       const appendNextChunk = () => {
+        // Check if this TTS instance is still active and sourceBuffer exists
+        if (!isActive || !sourceBuffer || mediaSource.readyState !== 'open') {
+          return;
+        }
+
         if (chunks.length > 0 && !sourceBuffer.updating) {
           try {
             const chunk = chunks.shift();
@@ -117,8 +134,10 @@ export async function initTTS(text: string): Promise<void> {
             // 🚨 Drop the bad chunk so we don't infinitely loop
             chunks.shift();
 
-            // Try the next chunk in the next tick
-            setTimeout(appendNextChunk, 100);
+            // Only retry if still active
+            if (isActive) {
+              setTimeout(appendNextChunk, 100);
+            }
           }
         }
       };
@@ -142,9 +161,17 @@ export async function initTTS(text: string): Promise<void> {
 
           stream.on("end", () => {
             const checkAndEndStream = () => {
+              if (!isActive) {
+                return; // Don't continue if this instance is no longer active
+              }
               if (chunks.length === 0 && !sourceBuffer.updating) {
-                mediaSource.endOfStream();
-                resolve(void 0);
+                try {
+                  mediaSource.endOfStream();
+                  resolve(void 0);
+                } catch (err) {
+                  // MediaSource might already be closed
+                  resolve(void 0);
+                }
               } else {
                 setTimeout(checkAndEndStream, 100);
               }
@@ -203,6 +230,12 @@ function stopPlayback() {
 }
 
 function cleanup() {
+  // Deactivate current TTS instance if exists
+  if (currentTTSDeactivate) {
+    currentTTSDeactivate();
+    currentTTSDeactivate = null;
+  }
+
   if (audioElement) {
     // Remove all event listeners to prevent memory leaks
     audioElement.onplay = null;
@@ -316,7 +349,8 @@ browser.runtime.onMessage.addListener(function handleMessage(
     }
   }
 
-  return true; // Always return true for polyfill compatibility
+  // Don't return true unless we need to send an async response
+  // This prevents "message channel closed" errors
 } as browser.Runtime.OnMessageListener);
 
 window.addEventListener('message', (event) => {
