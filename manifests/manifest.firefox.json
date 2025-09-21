@@ -9,7 +9,7 @@
       "id": "edge-tts-extension@travis2.com"
     }
   },
-  "homepage_url": "https://github.com/travisvn/edge-tts-chrome-extension",
+  "homepage_url": "https://github.com/travisvn/edge-tts-extension",
   "offline_enabled": true,
   "incognito": "spanning",
   "action": {
