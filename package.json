@@ -11,7 +11,10 @@
     "start": "webpack --watch --mode development",
     "start:chrome": "cross-env BROWSER=chrome NODE_ENV=development webpack --watch",
     "start:firefox": "cross-env BROWSER=firefox NODE_ENV=development webpack --watch",
-    "package:firefox": "web-ext build --source-dir dist/firefox --artifacts-dir web-ext-artifacts --overwrite-dest"
+    "package:firefox": "web-ext build --source-dir dist/firefox --artifacts-dir web-ext-artifacts --overwrite-dest",
+    "analyze": "cross-env ANALYZE=true NODE_ENV=production webpack",
+    "analyze:chrome": "cross-env BROWSER=chrome ANALYZE=true NODE_ENV=production webpack",
+    "analyze:firefox": "cross-env BROWSER=firefox ANALYZE=true NODE_ENV=production webpack"
   },
   "keywords": [
     "TTS",
@@ -49,6 +52,7 @@
     "typescript": "^5.8.2",
     "web-ext": "^8.5.0",
     "webpack": "^5.98.0",
+    "webpack-bundle-analyzer": "^4.10.2",
     "webpack-cli": "^6.0.1",
     "webpack-dev-server": "^5.2.0"
   }

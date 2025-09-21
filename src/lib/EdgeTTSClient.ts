@@ -1,5 +1,6 @@
 import { Buffer } from 'buffer';
 import { DRM } from './drm';
+import { VoiceCache } from '../utils/voiceCache';
 
 if (typeof globalThis.Buffer === 'undefined') {
   globalThis.Buffer = Buffer;
@@ -113,13 +114,35 @@ export class EdgeTTSClient {
     if (this.enableLogging) console.log(...args);
   }
 
-  private async sendMessage(message: string) {
-    for (let attempt = 1; attempt <= 3 && this.ws?.readyState !== WebSocket.OPEN; attempt++) {
-      if (attempt === 1) this.connectionStartTime = Date.now();
-      this.log(`Connecting... attempt ${attempt}`);
-      await this.initWebSocket();
+  private async sendMessage(message: string): Promise<void> {
+    const maxRetries = 3;
+    let lastError: Error | null = null;
+
+    for (let attempt = 1; attempt <= maxRetries; attempt++) {
+      try {
+        if (this.ws?.readyState !== WebSocket.OPEN) {
+          if (attempt === 1) this.connectionStartTime = Date.now();
+          this.log(`Connecting... attempt ${attempt}`);
+          await this.initWebSocket();
+        }
+
+        if (this.ws?.readyState === WebSocket.OPEN) {
+          this.ws.send(message);
+          return;
+        }
+      } catch (error) {
+        lastError = error instanceof Error ? error : new Error(String(error));
+        this.log(`Connection attempt ${attempt} failed:`, lastError.message);
+
+        if (attempt < maxRetries) {
+          // Exponential backoff: 1s, 2s, 4s
+          const delay = Math.pow(2, attempt - 1) * 1000;
+          await new Promise(resolve => setTimeout(resolve, delay));
+        }
+      }
     }
-    this.ws?.send(message);
+
+    throw new Error(`Failed to send message after ${maxRetries} attempts. Last error: ${lastError?.message}`);
   }
 
   private async initWebSocket() {
@@ -159,7 +182,10 @@ export class EdgeTTSClient {
 
       this.ws!.onmessage = (event) => this.handleMessage(event, metadataBuffer);
       this.ws!.onclose = () => this.handleClose();
-      this.ws!.onerror = (error) => reject(`Connection Error: ${error}`);
+      this.ws!.onerror = (error) => {
+        this.log('WebSocket error:', error);
+        reject(new Error(`WebSocket connection failed: ${error}`));
+      };
     });
   }
 
@@ -240,19 +266,50 @@ export class EdgeTTSClient {
     }`;
   }
 
-  async getVoices(): Promise<Voice[]> {
-    // Generate Sec-MS-GEC token for authentication
-    const secMsGec = await DRM.generateSecMsGec();
-
-    return fetch(EdgeTTSClient.VOICES_URL, {
-      headers: {
-        'Sec-MS-GEC': secMsGec,
-        'Sec-MS-GEC-Version': EdgeTTSClient.SEC_MS_GEC_VERSION,
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Safari/537.36 Edg/130.0.0.0'
+  async getVoices(useCache: boolean = true): Promise<Voice[]> {
+    try {
+      // Try to get voices from cache first
+      if (useCache) {
+        const cachedVoices = await VoiceCache.getCachedVoices();
+        if (cachedVoices) {
+          this.log('Using cached voices:', cachedVoices.length);
+          return cachedVoices;
+        }
       }
-    })
-      .then((response) => response.json())
-      .catch((error) => Promise.reject(error));
+
+      this.log('Fetching voices from API...');
+
+      // Generate Sec-MS-GEC token for authentication
+      const secMsGec = await DRM.generateSecMsGec();
+
+      const response = await fetch(EdgeTTSClient.VOICES_URL, {
+        headers: {
+          'Sec-MS-GEC': secMsGec,
+          'Sec-MS-GEC-Version': EdgeTTSClient.SEC_MS_GEC_VERSION,
+          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Safari/537.36 Edg/130.0.0.0'
+        }
+      });
+
+      if (!response.ok) {
+        throw new Error(`Failed to fetch voices: ${response.status} ${response.statusText}`);
+      }
+
+      const voices = await response.json();
+      if (!Array.isArray(voices)) {
+        throw new Error('Invalid voice list response format');
+      }
+
+      // Cache the voices for future use
+      if (useCache) {
+        await VoiceCache.setCachedVoices(voices);
+        this.log('Cached', voices.length, 'voices');
+      }
+
+      return voices;
+    } catch (error) {
+      this.log('Error fetching voices:', error);
+      throw new Error(`Failed to get voices: ${error instanceof Error ? error.message : String(error)}`);
+    }
   }
 
   async setMetadata(voiceName: string, outputFormat: OUTPUT_FORMAT, voiceLocale?: string) {
@@ -280,6 +337,16 @@ export class EdgeTTSClient {
   }
 
   toStream(text: string, options: ProsodyOptions = new ProsodyOptions()): EventEmitter {
+    // Validate text length (Microsoft's API has limits)
+    const maxLength = 10000; // Conservative limit
+    if (text.length > maxLength) {
+      throw new Error(`Text too long. Maximum length is ${maxLength} characters, got ${text.length}`);
+    }
+
+    if (!text.trim()) {
+      throw new Error('Text cannot be empty');
+    }
+
     return this.sendSSMLRequest(this.buildSSML(text, options));
   }
 

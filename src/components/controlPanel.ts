@@ -1,7 +1,7 @@
 import browser from 'webextension-polyfill';
 import { circlePause, circleStop } from '../lib/svgs';
 
-export async function createControlPanel(isLoading = true) {
+export async function createControlPanel(isLoading = true): Promise<HTMLElement> {
 	const settings = await browser.storage.sync.get({
 		darkMode: false,
 	});
@@ -20,7 +20,7 @@ export async function createControlPanel(isLoading = true) {
 	return panel;
 }
 
-export function updatePanelContent(panel, isLoading) {
+export function updatePanelContent(panel: HTMLElement, isLoading: boolean): void {
 	panel.innerHTML = `
 		${isLoading ? `
 			<div class="flex-center loading-container">
@@ -46,11 +46,11 @@ export function updatePanelContent(panel, isLoading) {
 		const stopButton = panel.querySelector('#tts-stop');
 
 		if (pauseButton) pauseButton.addEventListener('click', () => {
-			window.togglePause?.();
+			(window as any).togglePause?.();
 		});
 
 		if (stopButton) stopButton.addEventListener('click', () => {
-			window.stopPlayback?.();
+			(window as any).stopPlayback?.();
 		});
 	}
 }

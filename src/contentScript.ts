@@ -8,15 +8,15 @@ import {
 import { circlePause, circlePlay } from './lib/svgs';
 import { isFirefox } from './utils/browserDetection';
 
-let audioElement = null;
+let audioElement: HTMLAudioElement | null = null;
 let isPlaying = false;
-let controlPanel = null;
+let controlPanel: HTMLElement | null = null;
 
 // Make these functions available to the control panel
-window.togglePause = togglePause;
-window.stopPlayback = stopPlayback;
+(window as any).togglePause = togglePause;
+(window as any).stopPlayback = stopPlayback;
 
-export async function initTTS(text) {
+export async function initTTS(text: string): Promise<void> {
   cleanup();
   try {
     const settings = await browser.storage.sync.get({
@@ -50,12 +50,14 @@ export async function initTTS(text) {
         audioElement.muted = true; // 🔧 allow autoplay in Firefox
         audioElement.src = URL.createObjectURL(mediaSource);
 
-        navigator.mediaSession.setActionHandler("play", () => audioElement.play());
-        navigator.mediaSession.setActionHandler("pause", () => audioElement.pause());
+        navigator.mediaSession.setActionHandler("play", () => audioElement?.play());
+        navigator.mediaSession.setActionHandler("pause", () => audioElement?.pause());
         navigator.mediaSession.setActionHandler("stop", () => stopPlayback());
 
         audioElement.onplay = () => {
-          audioElement.muted = false; // 🔊 unmute once playback begins
+          if (audioElement) {
+            audioElement.muted = false; // 🔊 unmute once playback begins
+          }
           isPlaying = true;
           updatePlayPauseButton();
         };
@@ -68,6 +70,13 @@ export async function initTTS(text) {
         audioElement.onended = () => {
           isPlaying = false;
           updatePlayPauseButton();
+          // Clean up when playback ends naturally
+          cleanup();
+        };
+
+        audioElement.onerror = (error) => {
+          console.error('Audio playback error:', error);
+          cleanup();
         };
       }
 
@@ -89,12 +98,12 @@ export async function initTTS(text) {
               if (isFirstChunk) {
                 if (isFirefox()) {
                   setTimeout(() => {
-                    audioElement.play().catch((err) => {
+                    audioElement?.play().catch((err) => {
                       console.warn('Firefox autoplay workaround failed:', err);
                     });
                   }, 0);
                 } else {
-                  audioElement.play().catch((err) => {
+                  audioElement?.play().catch((err) => {
                     console.warn('Audio playback failed:', err);
                   });
                 }
@@ -194,9 +203,31 @@ function stopPlayback() {
 
 function cleanup() {
   if (audioElement) {
+    // Remove all event listeners to prevent memory leaks
+    audioElement.onplay = null;
+    audioElement.onpause = null;
+    audioElement.onended = null;
+    audioElement.onerror = null;
+    audioElement.onloadstart = null;
+    audioElement.oncanplay = null;
+
+    // Clean up media session handlers
+    try {
+      navigator.mediaSession.setActionHandler("play", null);
+      navigator.mediaSession.setActionHandler("pause", null);
+      navigator.mediaSession.setActionHandler("stop", null);
+    } catch (e) {
+      // Ignore errors if mediaSession is not supported
+    }
+
     const oldSrc = audioElement.src;
+    audioElement.pause();
     audioElement.src = "";
-    URL.revokeObjectURL(oldSrc);
+    audioElement.load(); // Force cleanup of internal buffers
+
+    if (oldSrc && oldSrc.startsWith('blob:')) {
+      URL.revokeObjectURL(oldSrc);
+    }
   }
   audioElement = null;
   isPlaying = false;
@@ -204,8 +235,17 @@ function cleanup() {
 }
 
 function removeControlPanel() {
-  if (controlPanel && controlPanel.parentNode) {
-    controlPanel.parentNode.removeChild(controlPanel);
+  if (controlPanel) {
+    // Remove all event listeners from control panel buttons
+    const buttons = controlPanel.querySelectorAll('button');
+    buttons.forEach(button => {
+      const newButton = button.cloneNode(true);
+      button.parentNode?.replaceChild(newButton, button);
+    });
+
+    if (controlPanel.parentNode) {
+      controlPanel.parentNode.removeChild(controlPanel);
+    }
   }
   controlPanel = null;
 }
@@ -226,7 +266,7 @@ browser.runtime.onMessage.addListener(function handleMessage(
     stopPlayback();
   }
   else if (request.action === "readText") {
-    initTTS(request.text).catch((error) => {
+    initTTS(request.text!).catch((error) => {
       console.error("TTS initialization error:", error);
     });
   }
@@ -254,3 +294,15 @@ window.addEventListener('message', (event) => {
     initTTS(text).catch((err) => console.error('initTTS error:', err));
   }
 });
+
+// Clean up resources when page is unloaded
+window.addEventListener('beforeunload', () => {
+  cleanup();
+});
+
+// Clean up when page becomes hidden (mobile browser optimization)
+// document.addEventListener('visibilitychange', () => {
+//   if (document.hidden && audioElement && !audioElement.paused) {
+//     audioElement.pause();
+//   }
+// });

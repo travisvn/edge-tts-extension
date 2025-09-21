@@ -46,17 +46,17 @@ function Popup() {
     });
   }, []);
 
-  const handleVoiceChange = (voice) => {
+  const handleVoiceChange = (voice: string) => {
     setSelectedVoice(voice);
     browser.storage.sync.set({ voiceName: voice });
   };
 
-  const handleCustomVoiceChange = (customVoice) => {
+  const handleCustomVoiceChange = (customVoice: string) => {
     setCustomVoice(customVoice);
     browser.storage.sync.set({ customVoice: customVoice });
   };
 
-  const handleSpeedChange = (newSpeed) => {
+  const handleSpeedChange = (newSpeed: number) => {
     setSpeed(newSpeed);
     browser.storage.sync.set({ speed: newSpeed });
   };

@@ -16,7 +16,6 @@
     "default_popup": "popup/index.html"
   },
   "background": {
-    "service_worker": "background/bundle.js",
     "scripts": ["background/bundle.js"]
   },
   "host_permissions": [

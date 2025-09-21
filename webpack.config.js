@@ -1,6 +1,7 @@
 // webpack.config.js
 const path = require('path');
 const CopyWebpackPlugin = require('copy-webpack-plugin');
+const { BundleAnalyzerPlugin } = require('webpack-bundle-analyzer');
 const fs = require('fs');
 
 // Determine the target browser from command line arguments
@@ -12,9 +13,11 @@ const getManifestPath = () => {
   return `./manifests/manifest.${targetBrowser}.json`;
 };
 
+const isProduction = process.env.NODE_ENV === 'production';
+const shouldAnalyze = process.env.ANALYZE === 'true';
+
 module.exports = {
-  mode: process.env.NODE_ENV === 'development' ? 'development' : 'production',
-  // mode: 'development',
+  mode: isProduction ? 'production' : 'development',
   entry: {
     popup: './src/popup/index.tsx',
     background: './src/background/index.ts',
@@ -25,6 +28,7 @@ module.exports = {
     filename: '[name]/bundle.js', // Outputs files like dist/popup/bundle.js
     clean: true, // Clean the output directory before emit
   },
+  devtool: isProduction ? false : 'source-map', // Disable source maps in production
   module: {
     rules: [
       {
@@ -46,8 +50,16 @@ module.exports = {
         { from: 'icons', to: 'icons' },
       ],
     }),
+    ...(shouldAnalyze ? [new BundleAnalyzerPlugin()] : []),
   ],
   resolve: {
     extensions: ['.ts', '.tsx', '.js', '.jsx'],
+  },
+  optimization: {
+    minimize: isProduction,
+    // Don't split chunks for browser extensions - each script must be self-contained
+    splitChunks: {
+      chunks: () => false,
+    },
   },
 };
