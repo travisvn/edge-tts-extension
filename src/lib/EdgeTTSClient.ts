@@ -1,10 +1,5 @@
-import { Buffer } from 'buffer';
 import { DRM } from './drm';
 import { VoiceCache } from '../utils/voiceCache';
-
-if (typeof globalThis.Buffer === 'undefined') {
-  globalThis.Buffer = Buffer;
-}
 
 export enum OUTPUT_FORMAT {
   AUDIO_24KHZ_48KBITRATE_MONO_MP3 = "audio-24khz-48kbitrate-mono-mp3",
@@ -190,8 +185,8 @@ export class EdgeTTSClient {
   }
 
   private handleMessage(event: MessageEvent, metadataBuffer: Metadata) {
-    const buffer = Buffer.from(event.data as ArrayBuffer);
-    const message = buffer.toString();
+    const buffer = new Uint8Array(event.data as ArrayBuffer);
+    const message = new TextDecoder().decode(buffer);
     const requestIdMatch = /X-RequestId:(.*?)\r\n/.exec(message);
     const requestId = requestIdMatch ? requestIdMatch[1] : "";
 
