@@ -7,12 +7,11 @@ export async function createControlPanel(isLoading = true): Promise<HTMLElement>
 	});
 
 	const panel = document.createElement('div');
-	panel.className = 'tts-controls';
+	panel.className = 'etts-tts-controls';
 	panel.id = 'tts-control-panel';
 
 	if (settings.darkMode) {
 		panel.dataset.theme = 'dark';
-		// panel.className += ' dark';
 	}
 
 	updatePanelContent(panel, isLoading);
@@ -23,17 +22,17 @@ export async function createControlPanel(isLoading = true): Promise<HTMLElement>
 export function updatePanelContent(panel: HTMLElement, isLoading: boolean): void {
 	panel.innerHTML = `
 		${isLoading ? `
-			<div class="flex-center loading-container">
+			<div class="etts-flex-center etts-loading-container">
 				<span>Generating audio...</span>
-				<div class="loading-spinner"></div>
+				<div class="etts-loading-spinner"></div>
 			</div>
 		` : `
-			<div class="flex-center">
-				<button id="tts-pause" class="tts-button">
+			<div class="etts-flex-center">
+				<button id="tts-pause" class="etts-tts-button">
 					${circlePause}
 					<span>Pause</span>
 				</button>
-				<button id="tts-stop" class="tts-button red">
+				<button id="tts-stop" class="etts-tts-button etts-red">
 					${circleStop}
 					<span>Stop</span>
 				</button>

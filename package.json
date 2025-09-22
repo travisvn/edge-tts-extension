@@ -1,6 +1,6 @@
 {
   "name": "edge-tts-extension",
-  "version": "1.1.0",
+  "version": "1.1.1",
   "scripts": {
     "dev": "webpack --mode development",
     "dev:chrome": "cross-env BROWSER=chrome NODE_ENV=development webpack",

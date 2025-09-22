@@ -20,83 +20,83 @@
   --etts-hover-bg: #0b5ed7;
 }
 
-.flex-center {
-  display: flex; /* Tailwind's flex */
+.etts-flex-center {
+  display: flex;
   flex-direction: row;
-  align-items: center; /* Tailwind's items-center */
-  justify-content: center; /* Tailwind's justify-center */
+  align-items: center;
+  justify-content: center;
   gap: 1rem;
 }
 
-.tts-icon {
-  width: 1rem; /* Tailwind's w-4 (4 * 0.25rem) */
-  height: 1rem; /* Tailwind's h-4 (4 * 0.25rem) */
-  margin-right: 0.25rem; /* Tailwind's mr-1 */
-  fill: none; /* Tailwind's fill-none */
-  stroke: currentColor; /* Tailwind's stroke-currentColor */
+.etts-tts-icon {
+  width: 1rem;
+  height: 1rem;
+  margin-right: 0.25rem;
+  fill: none;
+  stroke: currentColor;
 }
 
-.tts-input {
-  width: 100%; /* Tailwind's w-full */
-  padding-left: 0.75rem; /* Tailwind's px-3 */
+.etts-tts-input {
+  width: 100%;
+  padding-left: 0.75rem;
   padding-right: 0.75rem;
-  padding-top: 0.5rem; /* Tailwind's py-2 */
+  padding-top: 0.5rem;
   padding-bottom: 0.5rem;
-  border: 1px solid #d1d5db; /* Tailwind's border-gray-300 */
-  border-radius: 0.375rem; /* Tailwind's rounded */
-  outline: none; /* Tailwind's focus:outline-none */
+  border: 1px solid #d1d5db;
+  border-radius: 0.375rem;
+  outline: none;
 }
 
-.tts-input.dark {
-  background-color: #1f2937; /* Tailwind's dark:bg-gray-800 */
-  border-color: #4b5563; /* Tailwind's dark:border-gray-600 */
-  color: white; /* Tailwind's dark:text-white */
+.etts-tts-input.etts-dark {
+  background-color: #1f2937;
+  border-color: #4b5563;
+  color: white;
 }
 
-.transition-all {
+.etts-transition-all {
   transition: all 0.2s ease-in-out;
 }
 
-.min-width-200 {
+.etts-min-width-200 {
   min-width: 200px;
 }
 
-.space-x-3 {
+.etts-space-x-3 {
   display: flex;
   gap: 0.75rem;
 }
 
-.space-y-3 {
+.etts-space-y-3 {
   display: flex;
   flex-direction: column;
   gap: 0.75rem;
 }
 
-.animate-spin {
-  animation: spin 1s linear infinite;
+.etts-animate-spin {
+  animation: etts-spin 1s linear infinite;
 }
 
-@keyframes spin {
+@keyframes etts-spin {
   to {
     transform: rotate(360deg);
   }
 }
 
-.spinner {
-  height: 1.25rem; /* 5 * 0.25rem */
-  width: 1.25rem; /* 5 * 0.25rem */
-  border: 2px solid #2563eb; /* Blue border */
+.etts-spinner {
+  height: 1.25rem;
+  width: 1.25rem;
+  border: 2px solid #2563eb;
   border-radius: 50%;
-  border-top-color: transparent; /* Border-t-transparent */
+  border-top-color: transparent;
 }
 
-.lucide {
+.etts-lucide {
   width: 20px;
   height: 20px;
   stroke: var(--etts-button-text);
 }
 
-.tts-controls {
+.etts-tts-controls {
   position: fixed;
   bottom: 20px;
   right: 20px;
@@ -111,7 +111,7 @@
   transition: all 0.2s;
 }
 
-.tts-button {
+.etts-tts-button {
   background: var(--etts-button-bg);
   color: var(--etts-button-text);
   border: none;
@@ -125,32 +125,31 @@
   gap: 8px;
 }
 
-.tts-button:hover {
+.etts-tts-button:hover {
   background: var(--etts-hover-bg);
 }
 
-.tts-button.red {
+.etts-tts-button.etts-red {
   background: #dc3545;
 }
 
-.tts-button.red:hover {
+.etts-tts-button.etts-red:hover {
   background: #bb2d3b;
 }
 
-.loading-spinner {
+.etts-loading-spinner {
   border: 2px solid var(--etts-bg-secondary);
   border-top: 2px solid var(--etts-button-bg);
   border-radius: 50%;
   width: 20px;
   height: 20px;
-  animation: spin 1s linear infinite;
+  animation: etts-spin 1s linear infinite;
 }
 
-@keyframes spin {
-  0% {
-    transform: rotate(0deg);
-  }
-  100% {
-    transform: rotate(360deg);
-  }
+.etts-loading-container {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  justify-content: center;
+  gap: 1rem;
 }

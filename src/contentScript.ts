@@ -272,7 +272,7 @@ function removeControlPanel() {
   if (controlPanel) {
     // Remove all event listeners from control panel buttons
     const buttons = controlPanel.querySelectorAll('button');
-    buttons.forEach(button => {
+    buttons.forEach((button: HTMLButtonElement) => {
       const newButton = button.cloneNode(true);
       button.parentNode?.replaceChild(newButton, button);
     });
