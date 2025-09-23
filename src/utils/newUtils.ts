@@ -1,39 +1,68 @@
 import { ValueError } from './exceptions';
 import { TTSConfig } from './ttsConfig';
 
-function _findLastNewlineOrSpaceWithinLimit(text: Buffer, limit: number): number {
-  const slice = text.subarray(0, limit);
-  let splitAt = slice.lastIndexOf('\n');
-  if (splitAt < 0) {
-    splitAt = slice.lastIndexOf(' ');
+// Browser-compatible Buffer utilities
+class BrowserBuffer {
+  static from(input: string | ArrayBuffer | Uint8Array, encoding?: string): Uint8Array {
+    if (typeof input === 'string') {
+      return new TextEncoder().encode(input);
+    } else if (input instanceof ArrayBuffer) {
+      return new Uint8Array(input);
+    } else if (input instanceof Uint8Array) {
+      return input;
+    }
+    throw new Error('Unsupported input type for BrowserBuffer.from');
   }
-  return splitAt;
+
+  static concat(arrays: Uint8Array[]): Uint8Array {
+    const totalLength = arrays.reduce((sum, arr) => sum + arr.length, 0);
+    const result = new Uint8Array(totalLength);
+    let offset = 0;
+    for (const arr of arrays) {
+      result.set(arr, offset);
+      offset += arr.length;
+    }
+    return result;
+  }
 }
 
-function _findSafeUtf8SplitPoint(textSegment: Buffer): number {
+function _findLastNewlineOrSpaceWithinLimit(text: Uint8Array, limit: number): number {
+  const slice = text.subarray(0, limit);
+  const textStr = new TextDecoder().decode(slice);
+  let splitAt = textStr.lastIndexOf('\n');
+  if (splitAt < 0) {
+    splitAt = textStr.lastIndexOf(' ');
+  }
+  return splitAt >= 0 ? new TextEncoder().encode(textStr.substring(0, splitAt)).length : -1;
+}
+
+function _findSafeUtf8SplitPoint(textSegment: Uint8Array): number {
   let splitAt = textSegment.length;
   while (splitAt > 0) {
     const slice = textSegment.subarray(0, splitAt);
-    // check if the slice is a valid utf8 string
-    if (slice.toString('utf-8').endsWith('�')) {
+    try {
+      const decoded = new TextDecoder('utf-8', { fatal: true }).decode(slice);
+      return splitAt;
+    } catch {
       splitAt--;
-      continue;
     }
-    return splitAt;
   }
   return splitAt;
 }
 
-function _adjustSplitPointForXmlEntity(text: Buffer, splitAt: number): number {
-  let ampersandIndex = text.lastIndexOf('&', splitAt - 1);
+function _adjustSplitPointForXmlEntity(text: Uint8Array, splitAt: number): number {
+  const textStr = new TextDecoder().decode(text.subarray(0, splitAt));
+  let ampersandIndex = textStr.lastIndexOf('&');
   while (ampersandIndex !== -1) {
-    const semicolonIndex = text.indexOf(';', ampersandIndex);
-    if (semicolonIndex !== -1 && semicolonIndex < splitAt) {
+    const remainingText = textStr.substring(ampersandIndex);
+    const semicolonIndex = remainingText.indexOf(';');
+    if (semicolonIndex !== -1) {
       break; // Found a terminated entity
     }
     // Ampersand is not terminated before split_at
-    splitAt = ampersandIndex;
-    ampersandIndex = text.lastIndexOf('&', splitAt - 1);
+    splitAt = new TextEncoder().encode(textStr.substring(0, ampersandIndex)).length;
+    const newTextStr = new TextDecoder().decode(text.subarray(0, splitAt));
+    ampersandIndex = newTextStr.lastIndexOf('&');
   }
   return splitAt;
 }
@@ -41,13 +70,13 @@ function _adjustSplitPointForXmlEntity(text: Buffer, splitAt: number): number {
 /**
  * Splits text into chunks that don't exceed the specified byte length.
  * Attempts to split at word boundaries and handles UTF-8 encoding properly.
- * @param text - Text to split (string or Buffer)
+ * @param text - Text to split (string or Uint8Array)
  * @param byteLength - Maximum byte length per chunk
- * @yields Buffer chunks of the split text
+ * @yields Uint8Array chunks of the split text
  * @throws {ValueError} If byteLength is too small or text has invalid structure
  */
-export function* splitTextByByteLengthImproved(text: string | Buffer, byteLength: number): Generator<Buffer> {
-  let buffer = Buffer.isBuffer(text) ? text : Buffer.from(text, 'utf-8');
+export function* splitTextByByteLengthImproved(text: string | Uint8Array, byteLength: number): Generator<Uint8Array> {
+  let buffer = typeof text === 'string' ? BrowserBuffer.from(text) : text;
 
   if (byteLength <= 0) {
     throw new ValueError("byteLength must be greater than 0");
@@ -70,17 +99,17 @@ export function* splitTextByByteLengthImproved(text: string | Buffer, byteLength
     }
 
     const chunk = buffer.subarray(0, splitAt);
-    const chunkString = chunk.toString('utf-8').trim();
+    const chunkString = new TextDecoder().decode(chunk).trim();
     if (chunkString) {
-      yield Buffer.from(chunkString, 'utf-8');
+      yield BrowserBuffer.from(chunkString);
     }
 
     buffer = buffer.subarray(splitAt);
   }
 
-  const remainingChunk = buffer.toString('utf-8').trim();
+  const remainingChunk = new TextDecoder().decode(buffer).trim();
   if (remainingChunk) {
-    yield Buffer.from(remainingChunk, 'utf-8');
+    yield BrowserBuffer.from(remainingChunk);
   }
 }
 
@@ -90,8 +119,8 @@ export function* splitTextByByteLengthImproved(text: string | Buffer, byteLength
  * @param escapedText - Text content (should be XML-escaped)
  * @returns Complete SSML document string
  */
-export function mkssml(tc: TTSConfig, escapedText: string | Buffer): string {
-  const text = Buffer.isBuffer(escapedText) ? escapedText.toString('utf-8') : escapedText;
+export function mkssml(tc: TTSConfig, escapedText: string | Uint8Array): string {
+  const text = escapedText instanceof Uint8Array ? new TextDecoder().decode(escapedText) : escapedText;
   return (
     "<speak version='1.0' xmlns='http://www.w3.org/2001/10/synthesis' xml:lang='en-US'>"
     + `<voice name='${tc.voice}'>`

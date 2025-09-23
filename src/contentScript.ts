@@ -1,5 +1,5 @@
 import browser from 'webextension-polyfill';
-import { EdgeTTSClient, ProsodyOptions, OUTPUT_FORMAT } from './lib/EdgeTTSClient';
+import { BrowserCommunicate, BrowserCommunicateOptions } from './utils/browserCommunicate';
 import './content-styles.css';
 import {
   createControlPanel,
@@ -35,16 +35,20 @@ export async function initTTS(text: string): Promise<void> {
     // Create control panel in loading state
     controlPanel = await createControlPanel(true);
 
-    const tts = new EdgeTTSClient();
     const voiceName = settings.customVoice as string || settings.voiceName as string;
-    await tts.setMetadata(
-      voiceName, // Use custom voice if specified
-      OUTPUT_FORMAT.WEBM_24KHZ_16BIT_MONO_OPUS
-      // OUTPUT_FORMAT.AUDIO_24KHZ_48KBITRATE_MONO_MP3
-    );
 
-    const prosodyOptions = new ProsodyOptions();
-    prosodyOptions.rate = settings.speed as number;
+    // Convert speed setting to TTS format
+    const speedPercent = Math.round((settings.speed as number - 1) * 100);
+    const rateString = speedPercent >= 0 ? `+${speedPercent}%` : `${speedPercent}%`;
+
+    const browserCommunicateOptions: BrowserCommunicateOptions = {
+      voice: voiceName,
+      rate: rateString,
+      connectionTimeout: 10000, // 10 seconds timeout
+    };
+
+    // Create BrowserCommunicate instance
+    const communicate = new BrowserCommunicate(text, browserCommunicateOptions);
 
     return new Promise((resolve, reject) => {
       const mediaSource = new MediaSource();
@@ -144,44 +148,50 @@ export async function initTTS(text: string): Promise<void> {
 
       mediaSource.addEventListener('sourceopen', () => {
         try {
-          sourceBuffer = mediaSource.addSourceBuffer('audio/webm; codecs="opus"');
+          // Use MP3 format instead of WebM for better browser compatibility
+          sourceBuffer = mediaSource.addSourceBuffer('audio/mpeg');
           sourceBuffer.addEventListener('updateend', appendNextChunk);
 
-          const stream = tts.toStream(text, prosodyOptions);
-
-          stream.on("data", (data) => {
-            if (data instanceof Uint8Array) {
-              // Firefox fix: clone data before using it
-              const cloned = new Uint8Array(data.byteLength);
-              cloned.set(data);
-              chunks.push(cloned);
-              appendNextChunk();
-            }
-          });
-
-          stream.on("end", () => {
-            const checkAndEndStream = () => {
-              if (!isActive) {
-                return; // Don't continue if this instance is no longer active
-              }
-              if (chunks.length === 0 && !sourceBuffer.updating) {
-                try {
-                  mediaSource.endOfStream();
-                  resolve(void 0);
-                } catch (err) {
-                  // MediaSource might already be closed
-                  resolve(void 0);
+          // Start the chunked streaming process
+          (async () => {
+            try {
+              for await (const chunk of communicate.stream()) {
+                if (!isActive) {
+                  return; // Stop if this instance is no longer active
                 }
-              } else {
-                setTimeout(checkAndEndStream, 100);
-              }
-            };
-            checkAndEndStream();
-          });
 
-          // stream.on("error", (err) => {
-          //   reject(err);
-          // });
+                if (chunk.type === 'audio' && chunk.data) {
+                  // Firefox fix: clone data before using it
+                  const cloned = new Uint8Array(chunk.data.byteLength);
+                  cloned.set(chunk.data);
+                  chunks.push(cloned);
+                  appendNextChunk();
+                }
+              }
+
+              // All chunks processed, end the stream
+              const checkAndEndStream = () => {
+                if (!isActive) {
+                  return; // Don't continue if this instance is no longer active
+                }
+                if (chunks.length === 0 && !sourceBuffer.updating) {
+                  try {
+                    mediaSource.endOfStream();
+                    resolve(void 0);
+                  } catch (err) {
+                    // MediaSource might already be closed
+                    resolve(void 0);
+                  }
+                } else {
+                  setTimeout(checkAndEndStream, 100);
+                }
+              };
+              checkAndEndStream();
+            } catch (error) {
+              console.error('TTS streaming error:', error);
+              reject(error);
+            }
+          })();
         } catch (error) {
           reject(error);
         }

@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Edge Text to Speech Voice Reader",
-  "version": "1.1.1",
+  "version": "1.1.2",
   "description": "Text-to-speech service leveraging the Read Aloud API from Microsoft Edge.",
   "author": "Travis",
   "browser_specific_settings": {
