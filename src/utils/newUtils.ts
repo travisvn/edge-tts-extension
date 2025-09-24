@@ -279,9 +279,13 @@ export function dateToString(date?: Date): string {
 
 /**
  * Removes characters that are incompatible with SSML.
+ * Preserves essential punctuation (.?;:!,) for natural speech pauses.
+ * XML special characters (&<>"') are handled by the escape() function.
  */
 export function removeIncompatibleCharacters(str: string): string {
-  const chars_to_remove = "*.?;:!&/()[]{}$%^@#+=|\\~`><\"";
+  // Keep essential punctuation for natural speech: .?;:!,
+  // Remove characters that could break SSML structure or cause parsing issues
+  const chars_to_remove = "*/()[]{}$%^@#+=|\\~`><\"&";
   let clean_str = str;
   for (const char of chars_to_remove) {
     clean_str = clean_str.replace(new RegExp('\\' + char, 'g'), '');
