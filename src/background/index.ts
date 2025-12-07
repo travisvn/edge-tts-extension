@@ -5,7 +5,7 @@ browser.runtime.onInstalled.addListener(() => {
   // Add context menu for reading selected text
   browser.contextMenus.create({
     id: 'readAloud',
-    title: 'Read Aloud with Edge TTS',
+    title: 'Read Aloud with Edge TTS (Ctrl+Shift+S)',
     contexts: ['selection'],
   });
 
@@ -19,7 +19,7 @@ browser.runtime.onInstalled.addListener(() => {
   // Add context menu for reading from here (when text is selected)
   browser.contextMenus.create({
     id: 'readFromHere',
-    title: 'Start reading aloud from here',
+    title: 'Start reading aloud from here (Ctrl+Shift+E)',
     contexts: ['selection'],
   });
 });
