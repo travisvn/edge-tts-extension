@@ -18,7 +18,12 @@
     "https://speech.platform.bing.com/*",
     "wss://speech.platform.bing.com/*"
   ],
-  "permissions": ["contextMenus", "activeTab", "scripting", "storage"],
+  "permissions": [
+    "contextMenus",
+    "activeTab",
+    "scripting",
+    "storage"
+  ],
   "commands": {
     "read-selection": {
       "suggested_key": {
@@ -36,8 +41,8 @@
     },
     "read-from-here": {
       "suggested_key": {
-        "default": "Ctrl+Shift+H",
-        "mac": "Command+Shift+H"
+        "default": "Ctrl+Shift+E",
+        "mac": "Command+Shift+E"
       },
       "description": "Read from selected position to end of page"
     },
@@ -51,8 +56,12 @@
   },
   "content_scripts": [
     {
-      "matches": ["<all_urls>"],
-      "js": ["contentScript/bundle.js"]
+      "matches": [
+        "<all_urls>"
+      ],
+      "js": [
+        "contentScript/bundle.js"
+      ]
     }
   ],
   "icons": {
