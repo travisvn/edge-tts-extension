@@ -107,7 +107,7 @@
   padding: 15px;
   box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
   z-index: 10000;
-  min-width: 200px;
+  width: min(360px, calc(100vw - 40px));
   transition: all 0.2s;
 }
 
@@ -152,4 +152,35 @@
   align-items: center;
   justify-content: center;
   gap: 1rem;
+}
+
+.etts-panel-header, .etts-controls-row, .etts-filter-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.etts-panel-header { justify-content: space-between; margin-bottom: 8px; }
+.etts-icon-button { border: 0; background: transparent; color: inherit; cursor: pointer; font-size: 22px; }
+.etts-status { margin-bottom: 10px; color: var(--etts-text-secondary); }
+.etts-status-error { color: #dc3545; }
+.etts-controls-row { flex-wrap: wrap; }
+.etts-secondary { background: #6c757d; }
+.etts-tts-button[disabled] { opacity: .5; cursor: default; }
+.etts-field { display: grid; grid-template-columns: auto 1fr; gap: 6px 10px; margin-top: 12px; }
+.etts-field input { grid-column: 1 / -1; width: 100%; }
+.etts-field input[type='range'] { cursor: ew-resize; touch-action: none; }
+.etts-voice-settings { margin-top: 12px; }
+.etts-voice-heading { font-weight: 600; overflow-wrap: anywhere; }
+.etts-voice-settings .etts-tts-input { box-sizing: border-box; margin-top: 10px; background: var(--etts-bg-secondary); color: var(--etts-text-primary); }
+.etts-filter-row { margin-top: 8px; }
+.etts-filter-row select, .etts-filter-row button, #tts-voice-list { min-width: 0; border: 1px solid var(--etts-border-color); background: var(--etts-bg-secondary); color: var(--etts-text-primary); border-radius: 4px; padding: 5px; }
+.etts-filter-row select { flex: 1; }
+.etts-voice-count { margin: 8px 0 4px; color: var(--etts-text-secondary); font-size: 12px; }
+#tts-voice-list { box-sizing: border-box; width: 100%; }
+#etts-spoken-word-fallback { background: rgba(255, 213, 79, .72); z-index: 2147483646; }
+
+::highlight(etts-spoken-word) {
+  background-color: #ffd54f;
+  color: #111111;
 }

@@ -21,7 +21,8 @@
     "Text-to-Speech",
     "Read Aloud"
   ],
-  "author": "Travis",
+  "author": "Travis (original), Anass-El-jadd (enhancements)",
+  "homepage": "https://github.com/Anass-El-jadd/edge-tts-extension",
   "license": "AGPL-3.0-only",
   "description": "Text-to-speech service leveraging the Read Aloud API from Microsoft Edge. Select text on any webpage and listen to it read aloud in a natural voice. Or, listen to the entire page.",
   "dependencies": {

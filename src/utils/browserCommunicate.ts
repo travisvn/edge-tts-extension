@@ -20,17 +20,16 @@ import { isFirefox } from './browserDetection';
 
 // Browser-specific types (avoiding Node.js Buffer dependency)
 export type BrowserTTSChunk = {
-  type: "audio" | "WordBoundary";
+  type: "audio" | "WordBoundary" | "ChunkEnd";
   data?: Uint8Array;
   duration?: number;
   offset?: number;
   text?: string;
+  part?: number;
 };
 
 export type BrowserCommunicateState = {
   partialText: Uint8Array;
-  offsetCompensation: number;
-  lastDurationOffset: number;
   streamWasCalled: boolean;
 };
 
@@ -110,40 +109,50 @@ function browserGetHeadersAndDataFromBinary(message: Uint8Array): [{ [key: strin
 
 function browserSplitTextByByteLength(text: string, byteLength: number): Generator<Uint8Array> {
   return (function* () {
-    let buffer = new TextEncoder().encode(text);
-
     if (byteLength <= 0) {
       throw new Error("byteLength must be greater than 0");
     }
+    const encoder = new TextEncoder();
+    let remaining = text.trim();
 
-    while (buffer.length > byteLength) {
-      let splitAt = byteLength;
-
-      // Try to find a good split point (space or newline)
-      const slice = buffer.slice(0, byteLength);
-      const sliceText = new TextDecoder().decode(slice);
-      const lastNewline = sliceText.lastIndexOf('\n');
-      const lastSpace = sliceText.lastIndexOf(' ');
-
-      if (lastNewline > 0) {
-        splitAt = new TextEncoder().encode(sliceText.substring(0, lastNewline)).length;
-      } else if (lastSpace > 0) {
-        splitAt = new TextEncoder().encode(sliceText.substring(0, lastSpace)).length;
+    while (encoder.encode(remaining).length > byteLength) {
+      // Binary-search a character boundary that fits the byte limit. Slicing the
+      // encoded bytes directly can corrupt non-ASCII characters on long pages.
+      let low = 1;
+      let high = remaining.length;
+      while (low < high) {
+        const middle = Math.ceil((low + high) / 2);
+        if (encoder.encode(remaining.slice(0, middle)).length <= byteLength) low = middle;
+        else high = middle - 1;
       }
 
-      const chunk = buffer.slice(0, splitAt);
-      const chunkText = new TextDecoder().decode(chunk).trim();
-      if (chunkText) {
-        yield new TextEncoder().encode(chunkText);
-      }
+      let splitAt = low;
+      const candidate = remaining.slice(0, splitAt);
+      const paragraphBreak = candidate.lastIndexOf('\n');
+      const sentenceBreak = Math.max(
+        candidate.lastIndexOf('. '),
+        candidate.lastIndexOf('! '),
+        candidate.lastIndexOf('? '),
+      );
+      const wordBreak = candidate.lastIndexOf(' ');
+      const preferred = paragraphBreak > 0
+        ? paragraphBreak
+        : sentenceBreak > 0
+          ? sentenceBreak + 1
+          : wordBreak;
+      if (preferred > Math.floor(low * 0.5)) splitAt = preferred;
 
-      buffer = buffer.slice(splitAt);
+      // The input is SSML-escaped; never split inside an entity such as &amp;.
+      const ampersand = candidate.lastIndexOf('&', splitAt);
+      const semicolon = candidate.lastIndexOf(';', splitAt);
+      if (ampersand > semicolon && ampersand > 0) splitAt = ampersand;
+
+      const chunkText = remaining.slice(0, splitAt).trim();
+      if (chunkText) yield encoder.encode(chunkText);
+      remaining = remaining.slice(splitAt).trimStart();
     }
 
-    const remainingText = new TextDecoder().decode(buffer).trim();
-    if (remainingText) {
-      yield new TextEncoder().encode(remainingText);
-    }
+    if (remaining) yield encoder.encode(remaining);
   })();
 }
 
@@ -187,8 +196,6 @@ export class BrowserCommunicate {
 
   private state: BrowserCommunicateState = {
     partialText: BrowserBuffer.from(''),
-    offsetCompensation: 0,
-    lastDurationOffset: 0,
     streamWasCalled: false,
   };
 
@@ -223,18 +230,19 @@ export class BrowserCommunicate {
     this.connectionTimeout = options.connectionTimeout;
   }
 
-  private parseMetadata(data: Uint8Array): BrowserTTSChunk {
+  private parseMetadata(data: Uint8Array, part: number): BrowserTTSChunk {
     const metadata = JSON.parse(new TextDecoder().decode(data));
     for (const metaObj of metadata['Metadata']) {
       const metaType = metaObj['Type'];
       if (metaType === 'WordBoundary') {
-        const currentOffset = metaObj['Data']['Offset'] + this.state.offsetCompensation;
+        const currentOffset = metaObj['Data']['Offset'];
         const currentDuration = metaObj['Data']['Duration'];
         return {
           type: metaType,
           offset: currentOffset,
           duration: currentDuration,
           text: unescape(metaObj['Data']['text']['Text']),
+          part,
         };
       }
       if (metaType === 'SessionEnd') {
@@ -245,7 +253,7 @@ export class BrowserCommunicate {
     throw new UnexpectedResponse('No WordBoundary metadata found');
   }
 
-  private async * _stream(): AsyncGenerator<BrowserTTSChunk, void, unknown> {
+  private async * _stream(part: number): AsyncGenerator<BrowserTTSChunk, void, unknown> {
     const url = `${WSS_URL}&Sec-MS-GEC=${await BrowserDRM.generateSecMsGec()}&Sec-MS-GEC-Version=${SEC_MS_GEC_VERSION}&ConnectionId=${connectId()}`;
 
     const websocket = new WebSocket(url);
@@ -279,14 +287,12 @@ export class BrowserCommunicate {
         const path = headers['Path'];
         if (path === 'audio.metadata') {
           try {
-            const parsedMetadata = this.parseMetadata(parsedData);
-            this.state.lastDurationOffset = parsedMetadata.offset! + parsedMetadata.duration!;
+            const parsedMetadata = this.parseMetadata(parsedData, part);
             messageQueue.push(parsedMetadata);
           } catch (e) {
             messageQueue.push(e as Error);
           }
         } else if (path === 'turn.end') {
-          this.state.offsetCompensation = this.state.lastDurationOffset;
           websocket.close();
         } else if (path !== 'response' && path !== 'turn.start') {
           messageQueue.push(new UnknownResponse(`Unknown path received: ${path}`));
@@ -318,7 +324,7 @@ export class BrowserCommunicate {
               // Do nothing - this is expected behavior
             } else {
               // Accept audio data even without Content-Type header (for compatibility)
-              messageQueue.push({ type: 'audio', data: audioData });
+              messageQueue.push({ type: 'audio', data: audioData, part });
             }
           }
         }
@@ -361,7 +367,7 @@ export class BrowserCommunicate {
                   // Do nothing - this is expected behavior
                 } else {
                   // Accept audio data even without Content-Type header (for compatibility)
-                  messageQueue.push({ type: 'audio', data: audioData });
+                  messageQueue.push({ type: 'audio', data: audioData, part });
                 }
               }
             }
@@ -494,11 +500,14 @@ export class BrowserCommunicate {
     }
     this.state.streamWasCalled = true;
 
+    let part = 0;
     for (const partialText of this.texts) {
       this.state.partialText = partialText;
-      for await (const message of this._stream()) {
+      for await (const message of this._stream(part)) {
         yield message;
       }
+      yield { type: 'ChunkEnd', part };
+      part += 1;
     }
   }
-} 
+}

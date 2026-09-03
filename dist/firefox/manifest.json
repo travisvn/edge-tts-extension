@@ -3,17 +3,17 @@
   "name": "Edge Text to Speech Voice Reader",
   "version": "1.1.5",
   "description": "Text-to-speech service leveraging the Read Aloud API from Microsoft Edge.",
-  "author": "Travis",
+  "author": "Travis (original), Anass-El-jadd (enhancements)",
   "browser_specific_settings": {
     "gecko": {
       "id": "edge-tts-extension@travis2.com"
     }
   },
-  "homepage_url": "https://github.com/travisvn/edge-tts-extension",
+  "homepage_url": "https://github.com/Anass-El-jadd/edge-tts-extension",
   "offline_enabled": true,
   "incognito": "spanning",
   "action": {
-    "default_popup": "popup/index.html"
+    "default_popup": "sidepanel/index.html"
   },
   "background": {
     "scripts": ["background/bundle.js"]

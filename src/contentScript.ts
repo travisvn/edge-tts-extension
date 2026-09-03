@@ -1,30 +1,69 @@
 import browser from 'webextension-polyfill';
 import { BrowserCommunicate, BrowserCommunicateOptions } from './utils/browserCommunicate';
 import './content-styles.css';
-import {
-  createControlPanel,
-  updatePanelContent,
-} from "./components/controlPanel";
-import { circlePause, circlePlay } from './lib/svgs';
+type ReaderState = 'idle' | 'generating' | 'playing' | 'paused' | 'continuing' | 'error' | 'stopped';
 import { isFirefox } from './utils/browserDetection';
-import { extractTextFromSelection, extractTextFromSelectionSimple } from './utils/textExtraction';
+import {
+  ReadingDocument,
+  buildReadingDocument,
+  findSegmentAtPoint,
+  findTextOffsetForDomPosition,
+  findTextOffsetAtPoint,
+  rangeForOffsets,
+} from './utils/readingDocument';
 
 let audioElement: HTMLAudioElement | null = null;
 let isPlaying = false;
-let controlPanel: HTMLElement | null = null;
 let currentTTSDeactivate: (() => void) | null = null;
+let activeReadingDocument: ReadingDocument | null = null;
+let activeWordHighlight: Highlight | null = null;
+let highlightAnimationFrame: number | null = null;
+let autoScrollSuspended = false;
+let currentDynamicSession: DynamicPageSession | null = null;
+let lastReadOffset = 0;
+let currentWordOffset = 0;
+let streamSynthesisSpeed = 1.2;
+let requestedSpeed = 1.2;
+let preferredVoiceName: string | null = null;
+let lastErrorRetry: (() => void) | null = null;
 
-// Make these functions available to the control panel
-(window as any).togglePause = togglePause;
-(window as any).stopPlayback = stopPlayback;
+type DynamicPageSession = {
+  observer: MutationObserver;
+  seenElements: WeakSet<HTMLElement>;
+  seenOccurrences: Map<string, number>;
+  pending: boolean;
+  stopped: boolean;
+};
 
-export async function initTTS(text: string): Promise<void> {
+type TimedWord = {
+  relativeStartTime: number;
+  part: number;
+  textStart: number;
+  textEnd: number;
+};
+
+type QueuedAudioChunk = {
+  data: Uint8Array;
+  part: number;
+};
+
+function setReaderState(nextState: ReaderState, status = ''): void {
+  browser.runtime.sendMessage({ action: 'playbackState', state: nextState, status, followEnabled: !autoScrollSuspended }).catch(() => undefined);
+}
+
+export async function initTTS(
+  text: string,
+  readingDocument: ReadingDocument | null = null,
+  documentOffset = 0,
+  dynamicSession: DynamicPageSession | null = null,
+): Promise<void> {
   // Deactivate any previous TTS instance
   if (currentTTSDeactivate) {
     currentTTSDeactivate();
   }
 
-  cleanup();
+  const preserveDynamicSession = Boolean(dynamicSession && dynamicSession === currentDynamicSession);
+  cleanup(preserveDynamicSession);
   try {
     const settings = await browser.storage.sync.get({
       voiceName: "en-US-ChristopherNeural",
@@ -32,13 +71,14 @@ export async function initTTS(text: string): Promise<void> {
       speed: 1.2,
     });
 
-    // Create control panel in loading state
-    controlPanel = await createControlPanel(true);
+    setReaderState(dynamicSession && preserveDynamicSession ? 'continuing' : 'generating');
 
-    const voiceName = settings.customVoice as string || settings.voiceName as string;
+    const voiceName = preferredVoiceName || settings.voiceName as string || settings.customVoice as string;
 
     // Convert speed setting to TTS format
-    const speedPercent = Math.round((settings.speed as number - 1) * 100);
+    streamSynthesisSpeed = settings.speed as number;
+    requestedSpeed = streamSynthesisSpeed;
+    const speedPercent = Math.round((streamSynthesisSpeed - 1) * 100);
     const rateString = speedPercent >= 0 ? `+${speedPercent}%` : `${speedPercent}%`;
 
     const browserCommunicateOptions: BrowserCommunicateOptions = {
@@ -49,13 +89,24 @@ export async function initTTS(text: string): Promise<void> {
 
     // Create BrowserCommunicate instance
     const communicate = new BrowserCommunicate(text, browserCommunicateOptions);
+    activeReadingDocument = readingDocument;
+    lastReadOffset = documentOffset;
+    currentWordOffset = documentOffset;
+    autoScrollSuspended = false;
+    currentDynamicSession = dynamicSession;
 
     return new Promise((resolve, reject) => {
       const mediaSource = new MediaSource();
       let sourceBuffer: SourceBuffer;
-      const chunks: Uint8Array[] = [];
+      const chunks: QueuedAudioChunk[] = [];
       let isFirstChunk = true;
       let isActive = true; // Track if this TTS instance is still active
+      const timedWords: TimedWord[] = [];
+      const partStartTimes: number[] = [0];
+      const endedParts = new Set<number>();
+      let appendingPart: number | null = null;
+      let nextTimedWord = 0;
+      let textSearchOffset = 0;
 
       // Set up the deactivation function for this instance
       currentTTSDeactivate = () => {
@@ -76,31 +127,46 @@ export async function initTTS(text: string): Promise<void> {
             audioElement.muted = false; // 🔊 unmute once playback begins
           }
           isPlaying = true;
-          updatePlayPauseButton();
+          setReaderState('playing');
+          startHighlightLoop(
+            timedWords,
+            partStartTimes,
+            () => nextTimedWord,
+            (value) => { nextTimedWord = value; },
+          );
         };
 
         audioElement.onpause = () => {
           isPlaying = false;
-          updatePlayPauseButton();
+          setReaderState('paused');
+          stopHighlightLoop();
         };
 
         audioElement.onended = () => {
           isPlaying = false;
-          updatePlayPauseButton();
-          // Clean up when playback ends naturally
-          cleanup();
+          setReaderState('stopped');
+          stopHighlightLoop();
+          if (dynamicSession && dynamicSession === currentDynamicSession && !dynamicSession.stopped) {
+            continueDynamicReading(dynamicSession);
+          } else {
+            cleanup();
+          }
         };
 
         audioElement.onerror = (error) => {
           console.error('Audio playback error:', error);
-          cleanup();
+          showPlaybackError('Audio playback failed.');
         };
       }
 
-      // Update control panel immediately to show loading state
-      if (controlPanel) {
-        updatePanelContent(controlPanel, false);
-      }
+      const finalizeCompletedPart = (part: number): void => {
+        if (!endedParts.has(part) || appendingPart === part || chunks.some((chunk) => chunk.part === part)) {
+          return;
+        }
+        if (sourceBuffer.buffered.length > 0) {
+          partStartTimes[part + 1] = sourceBuffer.buffered.end(sourceBuffer.buffered.length - 1);
+        }
+      };
 
       const appendNextChunk = () => {
         // Check if this TTS instance is still active and sourceBuffer exists
@@ -113,11 +179,13 @@ export async function initTTS(text: string): Promise<void> {
             const chunk = chunks.shift();
             if (chunk) {
               // SAFELY COPY to avoid DOMException from detached buffer
-              const safeChunk = new Uint8Array(chunk.length);
-              safeChunk.set(chunk);
+              const safeChunk = new Uint8Array(chunk.data.length);
+              safeChunk.set(chunk.data);
+              appendingPart = chunk.part;
               sourceBuffer.appendBuffer(safeChunk);
 
               if (isFirstChunk) {
+                setReaderState('generating', 'Starting playback…');
                 if (isFirefox()) {
                   setTimeout(() => {
                     audioElement?.play().catch((err) => {
@@ -133,7 +201,7 @@ export async function initTTS(text: string): Promise<void> {
               }
             }
           } catch (err) {
-            console.error('appendNextChunk error:', err, 'chunk length:', chunks[0]?.length);
+            console.error('appendNextChunk error:', err, 'chunk length:', chunks[0]?.data.length);
 
             // 🚨 Drop the bad chunk so we don't infinitely loop
             chunks.shift();
@@ -153,7 +221,12 @@ export async function initTTS(text: string): Promise<void> {
             ? 'audio/webm; codecs="opus"'
             : 'audio/mpeg';
           sourceBuffer = mediaSource.addSourceBuffer(mimeType);
-          sourceBuffer.addEventListener('updateend', appendNextChunk);
+          sourceBuffer.addEventListener('updateend', () => {
+            const completedPart = appendingPart;
+            appendingPart = null;
+            if (completedPart !== null) finalizeCompletedPart(completedPart);
+            appendNextChunk();
+          });
 
           // Start the chunked streaming process
           (async () => {
@@ -170,8 +243,21 @@ export async function initTTS(text: string): Promise<void> {
                   // Firefox fix: clone data before using it
                   const cloned = new Uint8Array(chunk.data.byteLength);
                   cloned.set(chunk.data);
-                  chunks.push(cloned);
+                  chunks.push({ data: cloned, part: chunk.part ?? 0 });
                   appendNextChunk();
+                } else if (chunk.type === 'WordBoundary' && chunk.text && chunk.offset !== undefined) {
+                  const match = findSpokenWord(text, chunk.text, textSearchOffset);
+                  textSearchOffset = match.end;
+                  timedWords.push({
+                    relativeStartTime: chunk.offset / 10_000_000,
+                    part: chunk.part ?? 0,
+                    textStart: documentOffset + match.start,
+                    textEnd: documentOffset + match.end,
+                  });
+                } else if (chunk.type === 'ChunkEnd') {
+                  const part = chunk.part ?? 0;
+                  endedParts.add(part);
+                  finalizeCompletedPart(part);
                 }
               }
 
@@ -203,6 +289,7 @@ export async function initTTS(text: string): Promise<void> {
               checkAndEndStream();
             } catch (error) {
               console.error('TTS streaming error:', error);
+              showPlaybackError(error instanceof Error ? error.message : 'Speech generation failed.');
               reject(error);
             }
           })();
@@ -213,25 +300,8 @@ export async function initTTS(text: string): Promise<void> {
     });
   } catch (error) {
     console.error("TTS Error:", error);
-    cleanup();
+    showPlaybackError(error instanceof Error ? error.message : 'Speech generation failed.');
     throw error;
-  }
-}
-
-function updatePlayPauseButton() {
-  const pauseButton = document.querySelector("#tts-pause");
-  if (pauseButton) {
-    const buttonText =
-      audioElement && !audioElement.paused ? "Pause" : "Resume";
-    pauseButton.innerHTML = `
-      ${audioElement && !audioElement.paused
-        ? circlePause
-        : circlePlay
-      }
-      <span>
-        ${buttonText}
-      </span>
-    `;
   }
 }
 
@@ -251,9 +321,11 @@ function stopPlayback() {
     audioElement.currentTime = 0;
   }
   cleanup();
+  setReaderState('stopped');
+  browser.runtime.sendMessage({ action: 'playbackStopped' }).catch(() => undefined);
 }
 
-function cleanup() {
+function cleanup(preserveDynamicSession = false) {
   // Deactivate current TTS instance if exists
   if (currentTTSDeactivate) {
     currentTTSDeactivate();
@@ -289,29 +361,280 @@ function cleanup() {
   }
   audioElement = null;
   isPlaying = false;
-  removeControlPanel();
+  stopHighlightLoop();
+  clearWordHighlight();
+  activeReadingDocument = null;
+  if (!preserveDynamicSession && currentDynamicSession) {
+    currentDynamicSession.stopped = true;
+    currentDynamicSession.observer.disconnect();
+    currentDynamicSession = null;
+  }
 }
 
-function removeControlPanel() {
-  if (controlPanel) {
-    // Remove all event listeners from control panel buttons
-    const buttons = controlPanel.querySelectorAll('button');
-    buttons.forEach((button: HTMLButtonElement) => {
-      const newButton = button.cloneNode(true);
-      button.parentNode?.replaceChild(newButton, button);
-    });
+function showPlaybackError(error: string): void {
+  if (audioElement) audioElement.pause();
+  isPlaying = false;
+  lastErrorRetry = () => readMappedPageFrom(currentWordOffset || lastReadOffset);
+  setReaderState('error', error);
+}
 
-    if (controlPanel.parentNode) {
-      controlPanel.parentNode.removeChild(controlPanel);
+function changePlaybackSpeed(speed: number): void {
+  requestedSpeed = speed;
+  browser.storage.sync.set({ speed });
+  if (audioElement) audioElement.playbackRate = speed / streamSynthesisSpeed;
+}
+
+async function changePlaybackVoice(voiceName: string): Promise<void> {
+  preferredVoiceName = voiceName;
+  await browser.storage.sync.set({ voiceName, customVoice: '' });
+  if (activeReadingDocument && (isPlaying || audioElement)) {
+    await new Promise<void>((resolve, reject) => {
+      readMappedPageFrom(currentWordOffset || lastReadOffset);
+      // initTTS reports its real state asynchronously; acknowledging after the
+      // restart has been scheduled prevents the side panel from racing storage.
+      window.setTimeout(resolve, 0);
+    });
+  }
+}
+
+function resumeAutoScroll(): void {
+  autoScrollSuspended = false;
+  setReaderState(audioElement?.paused ? 'paused' : isPlaying ? 'playing' : 'idle');
+  if (activeReadingDocument) {
+    const range = rangeForOffsets(activeReadingDocument, currentWordOffset, currentWordOffset + 1);
+    range?.startContainer.parentElement?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  }
+}
+
+function findSpokenWord(text: string, word: string, from: number): { start: number; end: number } {
+  const exactIndex = text.toLocaleLowerCase().indexOf(word.toLocaleLowerCase(), from);
+  if (exactIndex >= 0) return { start: exactIndex, end: exactIndex + word.length };
+
+  const normalizedWord = word.replace(/^\W+|\W+$/g, '');
+  const normalizedIndex = normalizedWord
+    ? text.toLocaleLowerCase().indexOf(normalizedWord.toLocaleLowerCase(), from)
+    : -1;
+  if (normalizedIndex >= 0) {
+    return { start: normalizedIndex, end: normalizedIndex + normalizedWord.length };
+  }
+  return { start: from, end: Math.min(text.length, from + Math.max(word.length, 1)) };
+}
+
+function startHighlightLoop(
+  words: TimedWord[],
+  partStartTimes: number[],
+  getIndex: () => number,
+  setIndex: (value: number) => void,
+): void {
+  stopHighlightLoop();
+  const update = () => {
+    if (!audioElement || audioElement.paused) return;
+    let index = getIndex();
+    const playbackTime = audioElement.currentTime + 0.04;
+    const absoluteStartTime = (word: TimedWord): number | null => {
+      const partStart = partStartTimes[word.part];
+      return partStart === undefined ? null : partStart + word.relativeStartTime;
+    };
+    let nextStart = words[index + 1] ? absoluteStartTime(words[index + 1]) : null;
+    while (index + 1 < words.length && nextStart !== null && nextStart <= playbackTime) {
+      index += 1;
+      nextStart = words[index + 1] ? absoluteStartTime(words[index + 1]) : null;
+    }
+    const currentStart = words[index] ? absoluteStartTime(words[index]) : null;
+    if (words[index] && currentStart !== null && currentStart <= playbackTime) {
+      showWordHighlight(words[index].textStart, words[index].textEnd);
+      setIndex(index);
+    }
+    highlightAnimationFrame = window.requestAnimationFrame(update);
+  };
+  highlightAnimationFrame = window.requestAnimationFrame(update);
+}
+
+function stopHighlightLoop(): void {
+  if (highlightAnimationFrame !== null) {
+    window.cancelAnimationFrame(highlightAnimationFrame);
+    highlightAnimationFrame = null;
+  }
+}
+
+function showWordHighlight(start: number, end: number): void {
+  if (!activeReadingDocument) return;
+  clearWordHighlight();
+  const range = rangeForOffsets(activeReadingDocument, start, end);
+  if (!range) return;
+  currentWordOffset = start;
+  if (CSS.highlights && typeof Highlight !== 'undefined') {
+    activeWordHighlight = new Highlight(range);
+    CSS.highlights.set('etts-spoken-word', activeWordHighlight);
+  } else {
+    const marker = document.createElement('mark');
+    marker.id = 'etts-spoken-word-fallback';
+    marker.dataset.ettsHighlight = 'true';
+    const rect = range.getBoundingClientRect();
+    marker.style.position = 'fixed';
+    marker.style.pointerEvents = 'none';
+    marker.style.left = `${rect.left}px`; marker.style.top = `${rect.top}px`;
+    marker.style.width = `${rect.width}px`; marker.style.height = `${rect.height}px`;
+    document.body.appendChild(marker);
+  }
+
+  const segment = activeReadingDocument.segments.find((item) => start >= item.start && start < item.end);
+  if (segment && !autoScrollSuspended) {
+    const rect = range.getBoundingClientRect();
+    const margin = Math.min(180, window.innerHeight * 0.2);
+    if (rect.top < margin || rect.bottom > window.innerHeight - margin) {
+      segment.element.scrollIntoView({ behavior: 'smooth', block: 'center' });
     }
   }
-  controlPanel = null;
+}
+
+function clearWordHighlight(): void {
+  if (CSS.highlights) CSS.highlights.delete('etts-spoken-word');
+  const marker = document.querySelector<HTMLElement>('[data-etts-highlight="true"]');
+  marker?.remove();
+  activeWordHighlight = null;
+}
+
+function segmentFingerprint(text: string): string {
+  return text.replace(/\s+/g, ' ').trim();
+}
+
+function documentFromSegments(source: ReadingDocument, selected: ReadingDocument['segments']): ReadingDocument {
+  const text: string[] = [];
+  const positions: ReadingDocument['positions'] = [];
+  const segments: ReadingDocument['segments'] = [];
+  selected.forEach((segment) => {
+    const start = text.length;
+    for (let index = segment.start; index < segment.end; index += 1) {
+      text.push(source.text[index]);
+      positions.push(source.positions[index]);
+    }
+    segments.push({ element: segment.element, start, end: text.length });
+    text.push('\n'); positions.push(null);
+  });
+  if (text[text.length - 1] === '\n') { text.pop(); positions.pop(); }
+  return { text: text.join(''), positions, segments };
+}
+
+function createDynamicPageSession(readingDocument: ReadingDocument): DynamicPageSession {
+  const seenElements = new WeakSet<HTMLElement>();
+  const seenOccurrences = new Map<string, number>();
+  readingDocument.segments.forEach((segment) => seenElements.add(segment.element));
+  readingDocument.segments.forEach((segment) => {
+    const key = segmentFingerprint(readingDocument.text.slice(segment.start, segment.end));
+    seenOccurrences.set(key, (seenOccurrences.get(key) || 0) + 1);
+  });
+  const session = {
+    seenElements,
+    seenOccurrences,
+    pending: false,
+    stopped: false,
+    observer: new MutationObserver(() => undefined),
+  };
+  session.observer = new MutationObserver(() => {
+    if (session.pending || session.stopped) return;
+    session.pending = true;
+    window.setTimeout(() => { session.pending = false; }, 250);
+  });
+  session.observer.observe(document.body, { childList: true, subtree: true });
+  return session;
+}
+
+function continueDynamicReading(session: DynamicPageSession, attemptsRemaining = 6): void {
+  if (session.stopped || session !== currentDynamicSession) return;
+  const readingDocument = buildReadingDocument();
+  const encountered = new Map<string, number>();
+  const newSegments = readingDocument.segments.filter((segment) => {
+    const key = segmentFingerprint(readingDocument.text.slice(segment.start, segment.end));
+    const occurrence = (encountered.get(key) || 0) + 1;
+    encountered.set(key, occurrence);
+    return !session.seenElements.has(segment.element) && occurrence > (session.seenOccurrences.get(key) || 0);
+  });
+
+  if (newSegments.length > 0) {
+    readingDocument.segments.forEach((segment) => session.seenElements.add(segment.element));
+    encountered.forEach((count, key) => session.seenOccurrences.set(key, Math.max(count, session.seenOccurrences.get(key) || 0)));
+    const continuation = documentFromSegments(readingDocument, newSegments);
+    initTTS(continuation.text, continuation, 0, session).catch((error) => {
+      console.error('TTS continuation error:', error);
+      cleanup();
+    });
+    return;
+  }
+
+  if (attemptsRemaining > 0) {
+    window.setTimeout(() => continueDynamicReading(session, attemptsRemaining - 1), 500);
+  } else {
+    cleanup();
+  }
+}
+
+function readMappedPageFrom(offset: number): void {
+  const readingDocument = buildReadingDocument();
+  if (!readingDocument.text.trim()) {
+    console.warn('The page content is empty.');
+    return;
+  }
+  const safeOffset = Math.max(0, Math.min(offset, readingDocument.text.length));
+  const dynamicSession = createDynamicPageSession(readingDocument);
+  initTTS(
+    readingDocument.text.slice(safeOffset),
+    readingDocument,
+    safeOffset,
+    dynamicSession,
+  ).catch((error) => {
+    console.error('TTS initialization error:', error);
+  });
+}
+
+function getMappedSelection(readingDocument: ReadingDocument): { start: number; end: number } | null {
+  const selection = window.getSelection();
+  if (!selection || selection.rangeCount === 0 || selection.isCollapsed) return null;
+  const range = selection.getRangeAt(0);
+  const start = findTextOffsetForDomPosition(readingDocument, range.startContainer, range.startOffset, 0);
+  const end = findTextOffsetForDomPosition(
+    readingDocument,
+    range.endContainer,
+    range.endOffset,
+    readingDocument.text.length,
+  );
+  return end > start ? { start, end } : null;
+}
+
+function readTextWithMapping(text: string): void {
+  const readingDocument = buildReadingDocument();
+  const mappedSelection = getMappedSelection(readingDocument);
+  if (mappedSelection) {
+    initTTS(
+      readingDocument.text.slice(mappedSelection.start, mappedSelection.end),
+      readingDocument,
+      mappedSelection.start,
+    ).catch((error) => console.error('TTS initialization error:', error));
+    return;
+  }
+  const exactOffset = readingDocument.text.indexOf(text.trim());
+  if (exactOffset >= 0) {
+    initTTS(text.trim(), readingDocument, exactOffset).catch((error) => {
+      console.error('TTS initialization error:', error);
+    });
+    return;
+  }
+
+  // Older popup builds send document.body.innerText through readText. Treat a
+  // large unmatched payload as a page request so it still gets DOM mapping.
+  if (text.trim().length > 500) {
+    readMappedPageFrom(0);
+    return;
+  }
+  initTTS(text).catch((error) => console.error('TTS initialization error:', error));
 }
 
 // Define the message structure
 interface ExtensionMessage {
   action: string;
   text?: string;
+  value?: number;
+  voiceName?: string;
 }
 
 // Message listener with type assertion to bypass strict type checking
@@ -327,49 +650,31 @@ browser.runtime.onMessage.addListener(function handleMessage(
     togglePause();
   }
   else if (request.action === "readText") {
-    initTTS(request.text!).catch((error) => {
-      console.error("TTS initialization error:", error);
-    });
+    readTextWithMapping(request.text!);
   }
   else if (request.action === 'readPage') {
-    // Extract the page content
-    const pageContent = document.body.innerText;
-
-    if (pageContent && pageContent.trim() !== '') {
-      initTTS(pageContent).catch((error) => {
-        console.error("TTS initialization error:", error);
-      });
-    } else {
-      console.warn('The page content is empty.');
-    }
+    readMappedPageFrom(0);
   }
+  else if (request.action === 'retryPlayback') lastErrorRetry?.();
+  else if (request.action === 'resumeFollow') resumeAutoScroll();
+  else if (request.action === 'changeSpeed' && typeof request.value === 'number') changePlaybackSpeed(request.value);
+  else if (request.action === 'changeVoice' && request.voiceName) return changePlaybackVoice(request.voiceName);
   else if (request.action === 'readFromHere' && request.text) {
-    // Extract text from the current selection point to the end of the page
     try {
-      let textToRead = extractTextFromSelection(request.text);
-
-      // Fallback to simple extraction if the advanced method fails
-      if (!textToRead || textToRead.trim().length === 0) {
-        textToRead = extractTextFromSelectionSimple(request.text);
-      }
-
-      if (textToRead && textToRead.trim() !== '') {
-        initTTS(textToRead).catch((error) => {
-          console.error("TTS initialization error:", error);
-        });
-      } else {
-        console.warn('No text found from selection point.');
-        // Fallback to reading the selected text only
-        initTTS(request.text).catch((error) => {
-          console.error("TTS initialization error:", error);
-        });
-      }
+      const readingDocument = buildReadingDocument();
+      const mappedSelection = getMappedSelection(readingDocument);
+      const fallbackOffset = readingDocument.text.indexOf(request.text.trim());
+      const start = mappedSelection?.start ?? (fallbackOffset >= 0 ? fallbackOffset : 0);
+      const dynamicSession = createDynamicPageSession(readingDocument);
+      initTTS(
+        readingDocument.text.slice(start),
+        readingDocument,
+        start,
+        dynamicSession,
+      ).catch((error) => console.error('TTS initialization error:', error));
     } catch (error) {
       console.error("Error extracting text from selection:", error);
-      // Fallback to reading the selected text only
-      initTTS(request.text).catch((error) => {
-        console.error("TTS initialization error:", error);
-      });
+      readTextWithMapping(request.text);
     }
   }
 
@@ -383,8 +688,49 @@ window.addEventListener('message', (event) => {
   const { action, text } = event.data || {};
   if (action === 'triggerTTS' && typeof text === 'string') {
     initTTS(text).catch((err) => console.error('initTTS error:', err));
+  } else if (action === 'triggerReadPage') {
+    readMappedPageFrom(0);
   }
 });
+
+// Clicking only repositions a reader that is already playing. Starting TTS is
+// deliberately limited to the popup, context menu, and keyboard commands.
+document.addEventListener('click', (event) => {
+  if (event.button !== 0 || !activeReadingDocument || !isPlaying) return;
+  if (event.target instanceof Element && event.target.closest('a, button, input, select, textarea, summary, [role="button"], #tts-control-panel')) return;
+  const readingDocument = buildReadingDocument();
+  const segment = findSegmentAtPoint(readingDocument, event.target);
+  if (!segment) return;
+  event.preventDefault();
+  event.stopPropagation();
+  const offset = findTextOffsetAtPoint(readingDocument, segment, event.clientX, event.clientY);
+  const dynamicSession = currentDynamicSession;
+  if (dynamicSession) {
+    readingDocument.segments.forEach((item) => dynamicSession.seenElements.add(item.element));
+  }
+  initTTS(readingDocument.text.slice(offset), readingDocument, offset, dynamicSession).catch((error) => {
+    console.error('TTS initialization error:', error);
+  });
+}, true);
+
+function suspendAutoScroll(): void {
+  if (!activeReadingDocument || !isPlaying || autoScrollSuspended) return;
+  autoScrollSuspended = true;
+  setReaderState('playing');
+}
+
+// Let the listener move around the page without fighting the spoken-word
+// tracker. Clicking readable text starts a new session and re-enables follow.
+document.addEventListener('wheel', suspendAutoScroll, { passive: true, capture: true });
+document.addEventListener('touchmove', suspendAutoScroll, { passive: true, capture: true });
+document.addEventListener('pointerdown', (event) => {
+  if (event.clientX >= document.documentElement.clientWidth) suspendAutoScroll();
+}, true);
+document.addEventListener('keydown', (event) => {
+  if (['ArrowUp', 'ArrowDown', 'PageUp', 'PageDown', 'Home', 'End', ' '].includes(event.key)) {
+    suspendAutoScroll();
+  }
+}, true);
 
 // Clean up resources when page is unloaded
 window.addEventListener('beforeunload', () => {

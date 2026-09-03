@@ -19,7 +19,7 @@ const shouldAnalyze = process.env.ANALYZE === 'true';
 module.exports = {
   mode: isProduction ? 'production' : 'development',
   entry: {
-    popup: './src/popup/index.tsx',
+    sidepanel: './src/sidepanel/index.tsx',
     background: './src/background/index.ts',
     contentScript: './src/contentScript.ts',
   },
@@ -46,7 +46,7 @@ module.exports = {
     new CopyWebpackPlugin({
       patterns: [
         { from: getManifestPath(), to: 'manifest.json' },
-        { from: 'src/popup/index.html', to: 'popup/index.html' },
+        { from: 'src/sidepanel/index.html', to: 'sidepanel/index.html' },
         { from: 'icons', to: 'icons' },
       ],
     }),
